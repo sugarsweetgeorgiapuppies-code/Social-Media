@@ -1,0 +1,15 @@
+# Sugar Sweet Georgia Puppies — AI Social Media Employee
+# Core web framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+# Data + ORM
+SQLAlchemy==2.0.36
+pydantic==2.10.4
+# AI
+anthropic==0.116.0
+# Scheduling
+APScheduler==3.11.0
+# Config
+python-dotenv==1.0.1
+# Templating (dashboard is static, jinja used only for optional server render)
+jinja2==3.1.5

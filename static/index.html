@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sugar Sweet Georgia Puppies — Social Media Employee</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐶</text></svg>"
+    />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="paw">🐶</span>
+        <div>
+          <h1>Sugar Sweet Georgia Puppies</h1>
+          <p class="sub">AI Social Media Employee</p>
+        </div>
+      </div>
+      <div class="status" id="status">
+        <span class="pill" id="mode-pill">…</span>
+        <button class="btn primary" id="run-research">Run research now</button>
+      </div>
+    </header>
+
+    <nav class="tabs" id="tabs">
+      <button data-tab="briefing" class="active">Today's Briefing</button>
+      <button data-tab="ideas">Idea Database</button>
+      <button data-tab="approvals">Approvals</button>
+      <button data-tab="calendar">Calendar</button>
+      <button data-tab="published">Published</button>
+      <button data-tab="analytics">Analytics</button>
+      <button data-tab="series">Series</button>
+      <button data-tab="trends">Trends</button>
+      <button data-tab="inspiration">Inspiration</button>
+      <button data-tab="rules">Brand Rules</button>
+      <button data-tab="logs">Activity</button>
+    </nav>
+
+    <main id="view"><div class="loading">Loading…</div></main>
+
+    <!-- Idea detail drawer -->
+    <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
+    <aside class="drawer" id="drawer" hidden>
+      <button class="drawer-close" id="drawer-close">✕</button>
+      <div id="drawer-body"></div>
+    </aside>
+
+    <div class="toast" id="toast" hidden></div>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
