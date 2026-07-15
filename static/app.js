@@ -1,598 +1,586 @@
-/* Sugar Sweet Georgia Puppies — dashboard */
+/* Sugar Sweet Georgia Puppies — dashboard (friendly redesign) */
 "use strict";
 
+/* ------------------------------------------------------------------ API */
 const api = {
-  async get(path) { return this._json(await fetch(path)); },
-  async post(path, body) {
-    return this._json(await fetch(path, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: body ? JSON.stringify(body) : undefined,
-    }));
-  },
-  async patch(path, body) {
-    return this._json(await fetch(path, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }));
-  },
-  async put(path, body) {
-    return this._json(await fetch(path, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }));
-  },
-  async _json(r) {
-    if (!r.ok) { const t = await r.text(); throw new Error(t || r.statusText); }
-    return r.json();
-  },
+  get: (p) => fetch(p).then(j),
+  post: (p, b) => fetch(p, { method: "POST", headers: H, body: b ? JSON.stringify(b) : undefined }).then(j),
+  patch: (p, b) => fetch(p, { method: "PATCH", headers: H, body: JSON.stringify(b) }).then(j),
+  put: (p, b) => fetch(p, { method: "PUT", headers: H, body: JSON.stringify(b) }).then(j),
 };
+const H = { "Content-Type": "application/json" };
+async function j(r) { if (!r.ok) throw new Error((await r.text()) || r.statusText); return r.json(); }
 
-const $ = (sel, root = document) => root.querySelector(sel);
-const el = (html) => { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstElementChild; };
+/* --------------------------------------------------------------- helpers */
+const $ = (s, r = document) => r.querySelector(s);
+const el = (h) => { const t = document.createElement("template"); t.innerHTML = h.trim(); return t.content.firstElementChild; };
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const nl = (s) => esc(s).replace(/\n/g, "<br>");
-
-let TOAST_T;
-function toast(msg) {
-  const t = $("#toast"); t.textContent = msg; t.hidden = false;
-  clearTimeout(TOAST_T); TOAST_T = setTimeout(() => (t.hidden = true), 2600);
-}
-
 const view = $("#view");
-let CURRENT = "briefing";
+let CURRENT = "today", BRIEFING_EXISTS = false;
 
-// -------------------------------------------------------------------------
-// Status bar
-// -------------------------------------------------------------------------
+let TT;
+function toast(m) { const t = $("#toast"); t.textContent = m; t.hidden = false; clearTimeout(TT); TT = setTimeout(() => (t.hidden = true), 2600); }
+
+const PLAT_ICON = { Instagram: "📸", TikTok: "🎵", "YouTube Shorts": "▶️", Facebook: "👍", "Cross-platform": "🌐" };
+const CAT_ICON = { "Viral Entertainment": "🤣", Emotional: "🥹", Educational: "🎓", Local: "📍", "Behind-the-Scenes": "🎬", Conversion: "🛎️" };
+const TYPE_LABEL = {
+  current_trend: "Trending now", evergreen: "Always works", conversion: "Brings people in",
+  experimental: "Worth a test", recurring_series: "Series", community_engagement: "Get comments",
+};
+const catIcon = (c) => CAT_ICON[c] || "🐶";
+const platIcon = (p) => PLAT_ICON[p] || "🌐";
+
+/* ---------------------------------------------------------- status bar */
 async function loadStatus() {
   try {
     const s = await api.get("/api/status");
     const pill = $("#mode-pill");
-    if (s.ai_enabled) { pill.textContent = `Live research · ${s.model}`; pill.className = "pill live"; }
-    else { pill.textContent = "Inferred (offline) mode"; pill.className = "pill inferred"; }
-  } catch (e) { /* ignore */ }
+    if (s.ai_enabled) { pill.textContent = "Live research"; pill.className = "pill live dot"; pill.title = "Using live web research (" + s.model + ")"; }
+    else { pill.textContent = "Starter ideas"; pill.className = "pill inferred dot"; pill.title = "Add an API key for live daily trend research"; }
+  } catch {}
 }
 
-$("#run-research").addEventListener("click", async (e) => {
-  const btn = e.target; btn.disabled = true; const old = btn.textContent;
-  btn.textContent = "Researching…";
+const runBtn = $("#run-research");
+runBtn.addEventListener("click", runResearch);
+async function runResearch() {
+  runBtn.disabled = true;
+  const lbl = runBtn.querySelector(".lbl"), ic = runBtn.querySelector(".ic");
+  const old = lbl.textContent; lbl.textContent = "Working…"; ic.innerHTML = '<span class="spinner"></span>';
   try {
     await api.post("/api/research/run");
-    toast("Fresh research + briefing ready");
+    toast("✨ Today's plan is ready");
     await loadStatus();
-    if (CURRENT === "briefing") renderBriefing();
-    else switchTab(CURRENT);
-  } catch (e) { toast("Research failed: " + e.message); }
-  finally { btn.disabled = false; btn.textContent = old; }
-});
+    switchTab("today");
+  } catch (e) { toast("Couldn't build the plan: " + e.message); }
+  finally { runBtn.disabled = false; lbl.textContent = old; ic.textContent = "✨"; }
+}
+function setRunLabel() { $("#run-research .lbl").textContent = BRIEFING_EXISTS ? "Refresh plan" : "Get today's plan"; }
 
-// -------------------------------------------------------------------------
-// Tabs
-// -------------------------------------------------------------------------
-const TABS = {
-  briefing: renderBriefing, ideas: renderIdeas, approvals: renderApprovals,
-  calendar: renderCalendar, published: renderPublished, analytics: renderAnalytics,
-  series: renderSeries, trends: renderTrends, inspiration: renderInspiration,
-  rules: renderRules, logs: renderLogs,
-};
-$("#tabs").addEventListener("click", (e) => {
-  const b = e.target.closest("button[data-tab]"); if (!b) return;
-  switchTab(b.dataset.tab);
-});
+/* ----------------------------------------------------------------- nav */
+const TABS = { today: renderToday, ideas: renderIdeas, calendar: renderCalendar, results: renderResults, more: renderMore };
+$("#nav").addEventListener("click", (e) => { const b = e.target.closest("button[data-tab]"); if (b) switchTab(b.dataset.tab); });
 function switchTab(tab) {
   CURRENT = tab;
-  document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
-  view.innerHTML = '<div class="loading">Loading…</div>';
-  TABS[tab]().catch((e) => (view.innerHTML = `<div class="card">Error: ${esc(e.message)}</div>`));
+  document.querySelectorAll("#nav button").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+  view.innerHTML = skeleton();
+  window.scrollTo(0, 0);
+  TABS[tab]().catch((e) => (view.innerHTML = `<div class="card">Something went wrong: ${esc(e.message)}</div>`));
 }
+function skeleton() { return `<div class="card"><div class="skeleton sk-line" style="width:40%"></div><div class="skeleton sk-line"></div><div class="skeleton sk-line" style="width:80%"></div></div>`; }
 
-// -------------------------------------------------------------------------
-// Reusable bits
-// -------------------------------------------------------------------------
-function sourceBanner(source) {
-  if (source === "inferred")
-    return `<div class="banner">⚠️ These recommendations are <b>inferred from durable puppy best-practices</b>, not confirmed live research. Add an <kbd>ANTHROPIC_API_KEY</kbd> to enable daily live trend research.</div>`;
-  return "";
-}
-function ideaTags(i) {
-  return `<span class="tag cat">${esc(i.category)}</span>
-    <span class="tag plat">${esc(i.platform)}</span>
-    <span class="tag type">${esc((i.content_type || "").replace(/_/g, " "))}</span>
-    ${i.breed ? `<span class="tag">${esc(i.breed)}</span>` : ""}
-    <span class="tag status">${esc(i.status)}</span>`;
-}
-function ideaRow(i) {
-  const row = el(`<div class="idea-row" data-id="${i.id}">
-    <div>
-      <div class="idea-title">${esc(i.title)}</div>
-      <div class="idea-meta small muted">${i.hook ? esc(i.hook.slice(0, 90)) : esc((i.concept || "").slice(0, 90))}</div>
-      <div class="idea-meta">${ideaTags(i)}</div>
-    </div>
-    <div class="prio">★ ${i.priority_score}</div>
-  </div>`);
-  row.addEventListener("click", () => openIdea(i.id));
-  return row;
-}
-function scores(v, c) {
-  return `<div class="scores">
-    <div class="score"><b>${v}</b><span>Virality</span></div>
-    <div class="score"><b>${c}</b><span>Conversion</span></div>
+/* ------------------------------------------------------- shared pieces */
+function chips(i) {
+  return `<div class="chips">
+    <span class="chip plat">${platIcon(i.platform)} ${esc(i.platform)}</span>
+    <span class="chip cat">${esc(i.category)}</span>
+    ${i.breed ? `<span class="chip breed">${esc(i.breed)}</span>` : ""}
+    ${i.content_type ? `<span class="chip">${esc(TYPE_LABEL[i.content_type] || i.content_type)}</span>` : ""}
   </div>`;
 }
+function ideaRow(i) {
+  const r = el(`<div class="row" data-id="${i.id}">
+    <div class="avatar">${catIcon(i.category)}</div>
+    <div class="body">
+      <div class="r-title">${esc(i.title)}</div>
+      <div class="r-sub">${esc((i.hook || i.concept || "").slice(0, 80))}</div>
+      <div class="r-chips">${chips(i)}</div>
+    </div>
+    <span class="go">›</span>
+  </div>`);
+  r.addEventListener("click", () => openIdea(i.id));
+  return r;
+}
 
-// -------------------------------------------------------------------------
-// Today's briefing
-// -------------------------------------------------------------------------
-async function renderBriefing() {
+/* =====================================================================
+   TODAY
+   ===================================================================== */
+async function renderToday() {
   const b = await api.get("/api/briefing/today");
+  BRIEFING_EXISTS = b.exists; setRunLabel();
+
   if (!b.exists) {
-    view.innerHTML = `<div class="card"><h2>No briefing yet for ${esc(b.date)}</h2>
-      <p class="muted">Click <b>Run research now</b> in the top bar to have your social media employee research today's trends and build a filming plan.</p></div>`;
+    view.innerHTML = "";
+    view.appendChild(el(`<div class="card pad-lg empty">
+      <div class="big">🐶</div>
+      <h2>Good morning!</h2>
+      <p>Tap the button and your social media employee will research today's trends and hand you a ready-to-film video plan.</p>
+      <button class="btn primary block" id="go-plan"><span class="ic">✨</span> Get today's plan</button>
+      <p class="tiny" style="margin-top:14px">Takes a few seconds. You can do this any time.</p>
+    </div>`));
+    $("#go-plan").addEventListener("click", runResearch);
     return;
   }
-  const brf = b.briefing, d = brf.data;
-  const wrap = document.createDocumentFragment();
 
-  const head = el(`<div class="card">
-    ${sourceBanner(brf.source)}
-    <h2>${esc(brf.headline || "Today's briefing")}</h2>
-    <p>${nl(brf.summary)}</p>
-    ${d.why_film_this_today ? `<p class="small"><b>Why film this today:</b> ${nl(d.why_film_this_today)}</p>` : ""}
-  </div>`);
-  wrap.appendChild(head);
+  const brf = b.briefing, d = brf.data, p = b.primary_idea;
+  const frag = document.createDocumentFragment();
 
-  // Best video to film today
-  if (b.primary_idea) {
-    const p = b.primary_idea;
-    const card = el(`<div class="card">
-      <h2>🎬 Best video to film today</h2>
-      <h3>${esc(p.title)}</h3>
-      <div>${ideaTags(p)}</div>
-      ${scores(p.virality_score, p.conversion_value)}
-      <div class="hook-box">${esc(p.hook || p.first_second_visual || "")}</div>
-      <button class="btn primary" data-open="${p.id}">Open full filming package</button>
+  frag.appendChild(el(`<div class="stack" style="margin-bottom:14px">
+    <div class="eyebrow">Your briefing · ${esc(brf.date)}</div>
+    <h1 class="view-title">${esc(brf.headline || "Here's today's plan")}</h1>
+  </div>`));
+
+  if (brf.source === "inferred")
+    frag.appendChild(el(`<div class="banner info"><span class="bic">💡</span><div>These are dependable <b>starter ideas</b>, not today's live trends. Add an API key (Settings → How this works) to switch on live daily research.</div></div>`));
+
+  // Hero — best video to film today
+  if (p) {
+    const hero = el(`<div class="hero">
+      <div class="eyebrow">🎬 Film this today</div>
+      <h2>${esc(p.title)}</h2>
+      ${p.hook ? `<div class="quote">“${esc(p.hook)}”</div>` : ""}
+      ${chips(p)}
+      <div class="stat-row">
+        <div class="stat"><b>${p.virality_score}/10</b><span>Reach</span></div>
+        <div class="stat"><b>${p.conversion_value}/10</b><span>Brings buyers</span></div>
+        <div class="stat"><b>${esc(p.suggested_length || p.est_filming_time || "~20s")}</b><span>Length</span></div>
+      </div>
+      ${d.why_film_this_today ? `<p class="small soft">✅ <b>Why this one:</b> ${esc(d.why_film_this_today)}</p>` : ""}
+      <div class="btn-row" style="margin-top:16px">
+        <button class="btn primary" data-open="${p.id}"><span class="ic">📋</span> Open script & steps</button>
+        <button class="btn accent" data-quick-approve="${p.id}"><span class="ic">👍</span> Approve</button>
+      </div>
     </div>`);
-    card.querySelector("[data-open]").addEventListener("click", () => openIdea(p.id));
-    wrap.appendChild(card);
+    hero.querySelector("[data-open]").addEventListener("click", () => openIdea(p.id));
+    hero.querySelector("[data-quick-approve]").addEventListener("click", async (e) => {
+      const btn = e.currentTarget; btn.disabled = true;
+      await api.post(`/api/ideas/${p.id}/action`, { action: "approve" });
+      toast("👍 Approved — open it to film"); renderToday();
+    });
+    frag.appendChild(hero);
   }
 
-  // Trends worth using
+  // More ideas today
+  if ((b.additional_ideas || []).length) {
+    const c = el(`<div class="card list-card"><h3 style="padding:12px 0 4px">💡 More ideas for today</h3></div>`);
+    b.additional_ideas.forEach((i) => c.appendChild(ideaRow(i)));
+    frag.appendChild(c);
+  }
+
+  // Trends
   const trends = d.trends_worth_using || [];
   if (trends.length) {
-    const c = el(`<div class="card"><h2>📈 Trends worth using today</h2><div class="grid"></div></div>`);
-    const g = c.querySelector(".grid");
-    trends.forEach((t) => g.appendChild(el(`<div class="card" style="margin:0">
-      <h3>${esc(t.name)} <span class="tag plat">${esc(t.platform)}</span></h3>
-      <p class="small">${esc(t.description || "")}</p>
-      <p class="small"><b>Why it's working:</b> ${esc(t.why_working || "")}</p>
+    const c = el(`<details class="acc" open><summary>📈 Trends worth using today<span class="caret">›</span></summary><div class="acc-body"></div></details>`);
+    const body = c.querySelector(".acc-body");
+    trends.forEach((t) => body.appendChild(el(`<div style="padding:10px 0;border-top:1px solid var(--line)">
+      <div style="font-weight:700">${esc(t.name)} <span class="chip plat">${platIcon(t.platform)} ${esc(t.platform)}</span></div>
+      <p class="small soft" style="margin-top:4px">${esc(t.description || "")}</p>
       <p class="small"><b>Our version:</b> ${esc(t.adaptation || "")}</p>
-      <p class="small muted">Lifespan: ${esc(t.expected_lifespan || "—")} · Difficulty: ${esc(t.difficulty || "—")} · ~${esc(t.est_filming_time || "—")}</p>
-      ${scores(t.virality_score, t.conversion_value)}
+      <p class="tiny muted">Best while: ${esc(t.expected_lifespan || "—")} · ${esc(t.difficulty || "—")} to film · ~${esc(t.est_filming_time || "—")}</p>
     </div>`)));
-    wrap.appendChild(c);
+    frag.appendChild(c);
   }
 
-  // Additional ideas
-  if ((b.additional_ideas || []).length) {
-    const c = el(`<div class="card"><h2>💡 More ideas today</h2></div>`);
-    b.additional_ideas.forEach((i) => c.appendChild(ideaRow(i)));
-    wrap.appendChild(c);
-  }
-
-  // Community engagement + repurpose
-  const lists = el(`<div class="grid"></div>`);
-  lists.appendChild(listCard("🤝 Community engagement", b.community_engagement));
-  lists.appendChild(listCard("♻️ Content to repurpose", b.repurpose_ideas));
-  wrap.appendChild(lists);
+  // Community + repurpose
+  frag.appendChild(bulletCard("🤝 Quick wins today", "Small actions that grow your audience", b.community_engagement, "🐾"));
+  frag.appendChild(bulletCard("♻️ Reuse what you already have", "Turn old clips into new posts", b.repurpose_ideas, "✂️"));
 
   view.innerHTML = "";
-  view.appendChild(wrap);
+  view.appendChild(frag);
 }
-function listCard(title, items) {
-  const c = el(`<div class="card" style="margin:0"><h2>${title}</h2><ul></ul></div>`);
+function bulletCard(title, sub, items, icon) {
+  const c = el(`<div class="card"><h3>${title}</h3><p class="tiny muted" style="margin:2px 0 10px">${sub}</p><ul class="clean"></ul></div>`);
   const ul = c.querySelector("ul");
-  (items || []).forEach((x) => ul.appendChild(el(`<li class="small">${esc(x)}</li>`)));
-  if (!items || !items.length) ul.appendChild(el(`<li class="small muted">Nothing yet.</li>`));
+  (items || []).forEach((x) => ul.appendChild(el(`<li>${icon} ${esc(x)}</li>`)));
+  if (!items || !items.length) ul.appendChild(el(`<li class="muted">Nothing here yet.</li>`));
   return c;
 }
 
-// -------------------------------------------------------------------------
-// Idea database
-// -------------------------------------------------------------------------
-const STATUSES = ["New","Approved","Needs Revision","Ready to Film","Filmed","Editing","Scheduled","Published","Repurpose","Retest","Archived"];
-const CATEGORIES = ["Viral Entertainment","Emotional","Educational","Local","Behind-the-Scenes","Conversion"];
-const PLATFORMS = ["Instagram","TikTok","YouTube Shorts","Facebook","Cross-platform"];
-
+/* =====================================================================
+   IDEAS
+   ===================================================================== */
+const STATUS_SEGS = [
+  { k: "", label: "All" },
+  { k: "New", label: "Needs your OK" },
+  { k: "Approved", label: "Approved" },
+  { k: "Ready to Film", label: "To film" },
+  { k: "Published", label: "Posted" },
+];
 async function renderIdeas() {
   view.innerHTML = "";
+  const state = { q: "", status: "" };
+  view.appendChild(el(`<h1 class="view-title">Idea library</h1><p class="view-sub">Everything your employee has come up with. Tap any idea to see the full plan.</p>`));
+
   const bar = el(`<div class="filters">
-    <input id="f-q" placeholder="Search…" />
-    <select id="f-status"><option value="">All statuses</option>${STATUSES.map(s=>`<option>${s}</option>`).join("")}</select>
-    <select id="f-cat"><option value="">All categories</option>${CATEGORIES.map(s=>`<option>${s}</option>`).join("")}</select>
-    <select id="f-plat"><option value="">All platforms</option>${PLATFORMS.map(s=>`<option>${s}</option>`).join("")}</select>
-    <button class="btn" id="f-new">+ New idea</button>
+    <div class="search">🔎<input id="f-q" placeholder="Search ideas…"></div>
+    <button class="btn sm" id="f-new"><span class="ic">＋</span> New</button>
   </div>`);
-  view.appendChild(bar);
-  const listWrap = el(`<div class="card" id="idea-list"></div>`);
-  view.appendChild(listWrap);
+  const seg = el(`<div class="seg">${STATUS_SEGS.map((s, i) => `<button data-k="${s.k}" class="${i === 0 ? "active" : ""}">${s.label}</button>`).join("")}</div>`);
+  const list = el(`<div class="card list-card" id="idea-list" style="margin-top:12px"></div>`);
+  view.append(bar, seg, list);
 
   async function load() {
     const params = new URLSearchParams();
-    if ($("#f-q").value) params.set("q", $("#f-q").value);
-    if ($("#f-status").value) params.set("status", $("#f-status").value);
-    if ($("#f-cat").value) params.set("category", $("#f-cat").value);
-    if ($("#f-plat").value) params.set("platform", $("#f-plat").value);
-    const ideas = await api.get("/api/ideas?" + params.toString());
-    listWrap.innerHTML = ideas.length ? "" : `<p class="muted">No ideas yet. Run research or add one.</p>`;
-    ideas.forEach((i) => listWrap.appendChild(ideaRow(i)));
+    if (state.q) params.set("q", state.q);
+    if (state.status) params.set("status", state.status);
+    list.innerHTML = "";
+    const ideas = await api.get("/api/ideas?" + params);
+    if (!ideas.length) { list.innerHTML = `<p class="muted center" style="padding:24px">No ideas here yet.</p>`; return; }
+    ideas.forEach((i) => list.appendChild(ideaRow(i)));
   }
-  ["f-q","f-status","f-cat","f-plat"].forEach((id) => {
-    const node = $("#" + id);
-    node.addEventListener(id === "f-q" ? "input" : "change", debounce(load, 250));
-  });
+  let d; $("#f-q").addEventListener("input", (e) => { state.q = e.target.value; clearTimeout(d); d = setTimeout(load, 250); });
+  seg.addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return;
+    seg.querySelectorAll("button").forEach((x) => x.classList.remove("active")); b.classList.add("active");
+    state.status = b.dataset.k; load(); });
   $("#f-new").addEventListener("click", newIdeaForm);
   load();
 }
-function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
 
 function newIdeaForm() {
-  openDrawer(`<h2>New idea</h2>
+  const cats = Object.keys(CAT_ICON), plats = Object.keys(PLAT_ICON);
+  openDrawer(`<h2>New idea</h2><p class="tiny muted" style="margin-bottom:12px">Jot a rough idea — you can generate the full script after.</p>
     <div class="form-grid">
-      <div class="full"><label>Title</label><input id="n-title"></div>
-      <div><label>Category</label><select id="n-cat">${CATEGORIES.map(s=>`<option>${s}</option>`).join("")}</select></div>
-      <div><label>Platform</label><select id="n-plat">${PLATFORMS.map(s=>`<option>${s}</option>`).join("")}</select></div>
-      <div><label>Breed</label><input id="n-breed"></div>
-      <div><label>Content type</label><select id="n-type">
-        <option value="evergreen">Evergreen</option><option value="current_trend">Current trend</option>
-        <option value="conversion">Conversion</option><option value="experimental">Experimental</option>
-        <option value="recurring_series">Recurring series</option><option value="community_engagement">Community engagement</option>
-      </select></div>
-      <div class="full"><label>Concept</label><textarea id="n-concept"></textarea></div>
-      <div class="full"><label>Hook idea</label><input id="n-hook"></div>
-      <div><label>Virality (1-10)</label><input id="n-vir" type="number" min="1" max="10" value="6"></div>
-      <div><label>Conversion (1-10)</label><input id="n-con" type="number" min="1" max="10" value="5"></div>
-      <div><label>Difficulty</label><select id="n-diff"><option>Easy</option><option selected>Medium</option><option>Hard</option></select></div>
+      <div class="fld full"><label>Title</label><input id="n-title" placeholder="e.g. Yorkie meets a giant toy"></div>
+      <div class="fld"><label>Platform</label><select id="n-plat">${plats.map((p) => `<option>${p}</option>`).join("")}</select></div>
+      <div class="fld"><label>Category</label><select id="n-cat">${cats.map((c) => `<option>${c}</option>`).join("")}</select></div>
+      <div class="fld"><label>Breed (optional)</label><input id="n-breed" placeholder="Yorkie"></div>
+      <div class="fld"><label>Difficulty</label><select id="n-diff"><option>Easy</option><option selected>Medium</option><option>Hard</option></select></div>
+      <div class="fld full"><label>What happens in the video?</label><textarea id="n-concept"></textarea></div>
+      <div class="fld full"><label>Opening line / hook (optional)</label><input id="n-hook"></div>
     </div>
-    <div class="btn-row"><button class="btn primary" id="n-save">Create idea</button></div>`);
+    <button class="btn primary block" id="n-save" style="margin-top:14px">Create idea</button>`);
   $("#n-save").addEventListener("click", async () => {
-    const body = {
-      title: $("#n-title").value.trim(), category: $("#n-cat").value, platform: $("#n-plat").value,
-      breed: $("#n-breed").value, content_type: $("#n-type").value, concept: $("#n-concept").value,
-      hook: $("#n-hook").value, virality_score: +$("#n-vir").value, conversion_value: +$("#n-con").value,
-      difficulty: $("#n-diff").value,
-    };
-    if (!body.title) { toast("Title required"); return; }
-    const idea = await api.post("/api/ideas", body);
+    const title = $("#n-title").value.trim(); if (!title) return toast("Give it a title first");
+    const idea = await api.post("/api/ideas", {
+      title, platform: $("#n-plat").value, category: $("#n-cat").value, breed: $("#n-breed").value,
+      difficulty: $("#n-diff").value, concept: $("#n-concept").value, hook: $("#n-hook").value,
+    });
     toast("Idea created"); openIdea(idea.id);
-    if (CURRENT === "ideas") renderIdeas();
   });
 }
 
-// -------------------------------------------------------------------------
-// Idea drawer (full package + all controls)
-// -------------------------------------------------------------------------
+/* =====================================================================
+   IDEA DRAWER (the full plan + all controls)
+   ===================================================================== */
+const BREEDS = ["Maltipoo","Yorkie","Pomeranian","Poodle","Cavapoo","Chorkie","Miniature Schnauzer","Chihuahua","Shih Tzu","Bichon"];
+
 async function openIdea(id) {
   const i = await api.get(`/api/ideas/${id}`);
-  const pkg = i.script ? packageHtml(i) : `<p class="muted">No filming package yet.</p>
-    <button class="btn primary" id="build-pkg">Generate full filming package</button>`;
-  const comp = i.compliance && i.compliance.summary ? complianceHtml(i.compliance) : "";
-
-  openDrawer(`
-    <h2>${esc(i.title)}</h2>
-    <div>${ideaTags(i)}</div>
-    ${scores(i.virality_score, i.conversion_value)}
-    <p class="small muted">Difficulty ${esc(i.difficulty)} · ~${esc(i.est_filming_time || "?")} · Priority ★${i.priority_score} · Created ${esc(i.date_created)}</p>
-    ${i.concept ? `<div class="pkg-field"><label>Concept</label><div class="val">${nl(i.concept)}</div></div>` : ""}
-    ${comp}
-
-    <div class="section"><h3>Workflow</h3>
-      <div class="btn-row">
-        <button class="btn primary" data-act="approve">Approve</button>
-        <button class="btn" data-act="ready">Ready to film</button>
-        <button class="btn" data-act="mark_filmed">Mark filmed</button>
-        <button class="btn" data-act="mark_published">Mark published</button>
-        <button class="btn danger" data-act="reject">Reject</button>
-      </div>
-      <div class="btn-row">
-        <button class="btn ghost" data-act="revise">Request revision</button>
-        <button class="btn ghost" data-act="regenerate">Generate another version</button>
-        <button class="btn ghost" data-act="shorter">Shorten</button>
-        <button class="btn ghost" data-act="funnier">Funnier</button>
-        <button class="btn ghost" data-act="more_educational">More educational</button>
-        <button class="btn ghost" data-act="retest">Retest</button>
-      </div>
-      <div class="btn-row">
-        <select id="chg-breed"><option value="">Change breed…</option>${["Maltipoo","Yorkie","Pomeranian","Poodle","Cavapoo","Chorkie","Miniature Schnauzer","Chihuahua","Shih Tzu","Bichon"].map(b=>`<option>${b}</option>`).join("")}</select>
-        <select id="chg-plat"><option value="">Change platform…</option>${PLATFORMS.map(p=>`<option>${p}</option>`).join("")}</select>
-        <select id="chg-status"><option value="">Set status…</option>${STATUSES.map(s=>`<option ${s===i.status?"selected":""}>${s}</option>`).join("")}</select>
-      </div>
-    </div>
-
-    <div class="section"><h3>Filming package</h3><div id="pkg-holder">${pkg}</div></div>
-
-    <div class="section"><h3>Schedule & assignment</h3>
-      <div class="form-grid">
-        <div><label>Assigned employee</label><input id="a-emp" value="${esc(i.assigned_employee||"")}"></div>
-        <div><label>Record date</label><input id="a-rec" type="date" value="${i.recording_date||""}"></div>
-        <div><label>Publish date</label><input id="a-pub" type="date" value="${i.publishing_date||""}"></div>
-        <div><label>Reuse after</label><input id="a-reuse" type="date" value="${i.suggested_reuse_date||""}"></div>
-      </div>
-      <div class="btn-row"><button class="btn" id="save-sched">Save schedule</button></div>
-    </div>
-
-    <div class="section"><h3>Log performance</h3>${perfFormHtml(i)}</div>
-    <div class="section"><h3>Team feedback / notes</h3>
-      <div class="pkg-field"><div class="val">${i.notes ? nl(i.notes) : '<span class="muted">No notes yet.</span>'}</div></div>
-      <div class="form-grid"><div class="full"><textarea id="fb-note" placeholder="Add a note or employee feedback…"></textarea></div></div>
-      <div class="btn-row"><button class="btn" id="save-note">Save note</button></div>
-    </div>
-  `);
-
+  const has = !!i.script;
   const reload = () => openIdea(id);
 
-  const buildBtn = $("#build-pkg");
-  if (buildBtn) buildBtn.addEventListener("click", async () => {
-    buildBtn.disabled = true; buildBtn.textContent = "Generating…";
-    await api.post(`/api/ideas/${id}/package`); toast("Filming package ready"); reload();
-  });
+  const comp = i.compliance && i.compliance.summary && (i.compliance.issues || []).length
+    ? `<div class="banner warn"><span class="bic">⚠️</span><div><b>Quick check:</b> ${esc(i.compliance.summary)}
+        <ul class="clean tiny" style="margin-top:5px">${i.compliance.issues.map((x, n) => `<li>${esc(x)}${i.compliance.fixes && i.compliance.fixes[n] ? " — <i>" + esc(i.compliance.fixes[n]) + "</i>" : ""}</li>`).join("")}</ul></div></div>`
+    : (i.compliance && i.compliance.passed ? `<div class="banner good"><span class="bic">✅</span> Passed the brand safety check.</div>` : "");
+
+  const packageBlock = has ? `
+    ${acc("🎬 The video — what to film", `
+      ${field("First thing on screen", i.first_second_visual)}
+      ${i.hook ? `<div class="quote">“${esc(i.hook)}”</div>` : ""}
+      ${copyField("Full script", i.script)}
+      ${field("How to film it (step by step)", i.filming_instructions)}
+      ${field("Text on screen", i.on_screen_text)}
+      <div class="chips" style="margin-top:8px">
+        ${i.suggested_length ? `<span class="chip">⏱ ${esc(i.suggested_length)}</span>` : ""}
+      </div>
+      ${field("How to edit", i.editing_instructions)}
+      ${field("Music / sound", i.audio_direction)}
+    `, true)}
+    ${acc("📝 The caption & hashtags — copy & paste", `
+      ${copyField("Caption", i.caption)}
+      ${copyField("Hashtags", i.hashtags)}
+      ${copyField("Post title", i.platform_title)}
+      ${copyField("YouTube Shorts title", i.youtube_title)}
+      ${copyField("Cover / thumbnail text", i.cover_text)}
+      ${copyField("Pinned comment", i.pinned_comment)}
+      ${field("Call to action", i.call_to_action)}
+    `)}
+    ${acc("🔁 Backups & no-talking version", `
+      ${field("Backup hook", i.backup_hook)}
+      ${copyField("Backup caption", i.backup_caption)}
+      ${field("Film it without talking", i.no_speak_version)}
+    `)}
+  ` : `<div class="card center" style="margin:0 0 12px">
+      <p class="muted small" style="margin-bottom:12px">No script yet for this idea.</p>
+      <button class="btn primary block" id="build-pkg"><span class="ic">✍️</span> Write the full script & filming plan</button>
+    </div>`;
+
+  openDrawer(`
+    <div style="display:flex;gap:12px;align-items:flex-start">
+      <div class="avatar" style="width:46px;height:46px;font-size:1.3rem">${catIcon(i.category)}</div>
+      <div style="flex:1;min-width:0"><h2 style="font-size:1.25rem">${esc(i.title)}</h2>
+      <div style="margin-top:6px">${chips(i)}</div></div>
+    </div>
+    <div class="chips" style="margin-top:10px">
+      <span class="chip status">${esc(friendlyStatus(i.status))}</span>
+      <span class="chip">📈 ${i.virality_score}/10 reach</span>
+      <span class="chip">🛎️ ${i.conversion_value}/10 buyers</span>
+      <span class="chip">${esc(i.difficulty)} to film</span>
+    </div>
+    ${i.concept ? `<p class="small soft" style="margin-top:12px">${nl(i.concept)}</p>` : ""}
+    ${comp}
+
+    <div class="btn-row" style="margin:14px 0">
+      <button class="btn accent" data-act="approve"><span class="ic">👍</span> Approve</button>
+      <button class="btn" data-act="mark_filmed"><span class="ic">🎥</span> Filmed it</button>
+      <button class="btn" data-act="mark_published"><span class="ic">🚀</span> Posted it</button>
+      <button class="btn danger" data-act="reject"><span class="ic">🗑</span> Skip</button>
+    </div>
+
+    ${has ? `<div class="card" style="margin:0 0 12px;padding:14px">
+      <div class="tiny muted" style="margin-bottom:8px;font-weight:700;text-transform:uppercase;letter-spacing:.04em">Want it different?</div>
+      <div class="btn-row">
+        <button class="btn subtle sm" data-act="shorter">Shorter</button>
+        <button class="btn subtle sm" data-act="funnier">Funnier</button>
+        <button class="btn subtle sm" data-act="more_educational">More helpful</button>
+        <button class="btn subtle sm" data-act="regenerate">Fresh version</button>
+        <select id="chg-breed" class="sm"><option value="">Different breed…</option>${BREEDS.map((b) => `<option>${b}</option>`).join("")}</select>
+      </div></div>` : ""}
+
+    ${packageBlock}
+
+    ${acc("📅 Schedule & who films it", `
+      <div class="form-grid">
+        <div class="fld"><label>Assigned to</label><input id="a-emp" value="${esc(i.assigned_employee || "")}" placeholder="Name"></div>
+        <div class="fld"><label>Film on</label><input id="a-rec" type="date" value="${i.recording_date || ""}"></div>
+        <div class="fld"><label>Post on</label><input id="a-pub" type="date" value="${i.publishing_date || ""}"></div>
+        <div class="fld"><label>Reuse after</label><input id="a-reuse" type="date" value="${i.suggested_reuse_date || ""}"></div>
+      </div>
+      <button class="btn block sm" id="save-sched" style="margin-top:10px">Save schedule</button>
+    `)}
+
+    ${acc("📊 Add the numbers (after you post)", `
+      <p class="tiny muted" style="margin-bottom:10px">Fill in what you can — shares, saves, comments and store calls matter most. The more you log, the smarter tomorrow's ideas get.</p>
+      ${perfForm(i)}
+      <button class="btn accent block" id="save-perf" style="margin-top:10px">Save the numbers</button>
+    `)}
+
+    ${acc("🗒 Notes", `
+      <div class="val" style="margin-bottom:10px">${i.notes ? nl(i.notes) : '<span class="muted">No notes yet.</span>'}</div>
+      <textarea id="fb-note" placeholder="Add a note for your team…"></textarea>
+      <button class="btn block sm" id="save-note" style="margin-top:8px">Save note</button>
+    `)}
+  `);
+
+  wireCopy();
+  const bp = $("#build-pkg");
+  if (bp) bp.addEventListener("click", async () => { bp.disabled = true; bp.innerHTML = '<span class="spinner"></span> Writing…'; await api.post(`/api/ideas/${id}/package`); toast("Script ready"); reload(); });
 
   document.querySelectorAll("[data-act]").forEach((btn) => btn.addEventListener("click", async () => {
-    const act = btn.dataset.act;
-    let value = "";
-    if (act === "revise") value = prompt("What should change?") || "";
-    if (act === "reject") value = prompt("Reason (optional)") || "";
+    const act = btn.dataset.act; let value = "";
+    if (act === "reject" && !confirm("Skip this idea? It moves to the archive.")) return;
     btn.disabled = true;
     await api.post(`/api/ideas/${id}/action`, { action: act, value });
-    toast("Done"); reload(); loadStatus();
+    toast(ACT_MSG[act] || "Done"); reload(); loadStatus();
   }));
+  const cb = $("#chg-breed");
+  if (cb) cb.addEventListener("change", async (e) => { if (!e.target.value) return; toast("Rewriting…"); await api.post(`/api/ideas/${id}/action`, { action: "change_breed", value: e.target.value }); reload(); });
 
-  const bindChange = (sel, action) => $(sel).addEventListener("change", async (e) => {
-    if (!e.target.value) return;
-    if (action === "status") { await api.patch(`/api/ideas/${id}`, { status: e.target.value }); }
-    else { await api.post(`/api/ideas/${id}/action`, { action, value: e.target.value }); }
-    toast("Updated"); reload();
+  $("#save-sched")?.addEventListener("click", async () => {
+    await api.patch(`/api/ideas/${id}`, { assigned_employee: $("#a-emp").value, recording_date: $("#a-rec").value || null, publishing_date: $("#a-pub").value || null, suggested_reuse_date: $("#a-reuse").value || null });
+    toast("Saved to your calendar");
   });
-  bindChange("#chg-breed", "change_breed");
-  bindChange("#chg-plat", "change_platform");
-  bindChange("#chg-status", "status");
-
-  $("#save-sched").addEventListener("click", async () => {
-    await api.patch(`/api/ideas/${id}`, {
-      assigned_employee: $("#a-emp").value,
-      recording_date: $("#a-rec").value || null,
-      publishing_date: $("#a-pub").value || null,
-      suggested_reuse_date: $("#a-reuse").value || null,
-    });
-    toast("Schedule saved"); reload();
-  });
-  $("#save-note").addEventListener("click", async () => {
-    const note = $("#fb-note").value.trim(); if (!note) return;
-    await api.post(`/api/ideas/${id}/feedback`, { note }); toast("Note saved"); reload();
-  });
-  $("#save-perf").addEventListener("click", async () => {
+  $("#save-note")?.addEventListener("click", async () => { const n = $("#fb-note").value.trim(); if (!n) return; await api.post(`/api/ideas/${id}/feedback`, { note: n }); toast("Note saved"); reload(); });
+  $("#save-perf")?.addEventListener("click", async () => {
     const body = {};
-    document.querySelectorAll("[data-perf]").forEach((n) => {
-      const v = n.value; if (v === "") return;
-      body[n.dataset.perf] = n.type === "number" ? +v : v;
-    });
-    await api.post(`/api/ideas/${id}/performance`, body);
-    toast("Performance logged"); reload(); loadStatus();
+    document.querySelectorAll("[data-perf]").forEach((n) => { if (n.value !== "") body[n.dataset.perf] = n.type === "number" ? +n.value : n.value; });
+    if (!Object.keys(body).length) return toast("Enter at least one number");
+    await api.post(`/api/ideas/${id}/performance`, body); toast("📊 Numbers saved — thank you!"); reload(); loadStatus();
   });
 }
+const ACT_MSG = { approve: "👍 Approved", mark_filmed: "🎥 Marked as filmed", mark_published: "🚀 Marked as posted", reject: "Skipped", shorter: "Made it shorter", funnier: "Made it funnier", more_educational: "Made it more helpful", regenerate: "Fresh version ready" };
+function friendlyStatus(s) { return ({ New: "Needs your OK", "Ready to Film": "Ready to film", Published: "Posted" }[s]) || s; }
 
-function packageHtml(i) {
-  const f = (label, val) => val ? `<div class="pkg-field copyable"><label>${label}</label><div class="val">${nl(val)}</div><button class="btn sm copy" data-copy="${esc(val)}">copy</button></div>` : "";
-  const html = [
-    f("First-second visual", i.first_second_visual),
-    `<div class="hook-box">${esc(i.hook)}</div>`,
-    f("Full script", i.script),
-    f("Shot-by-shot filming", i.filming_instructions),
-    f("On-screen text", i.on_screen_text),
-    f("Suggested length", i.suggested_length),
-    f("Editing", i.editing_instructions),
-    f("Audio / music", i.audio_direction),
-    f("Caption", i.caption),
-    f("Platform title", i.platform_title),
-    f("YouTube Shorts title", i.youtube_title),
-    f("Hashtags", i.hashtags),
-    f("Cover text", i.cover_text),
-    f("Pinned comment", i.pinned_comment),
-    f("Call to action", i.call_to_action),
-    f("Backup hook", i.backup_hook),
-    f("Backup caption", i.backup_caption),
-    f("No-talking version", i.no_speak_version),
-  ].join("");
-  return html;
+function acc(title, body, open) {
+  return `<details class="acc" ${open ? "open" : ""}><summary>${title}<span class="caret">›</span></summary><div class="acc-body">${body}</div></details>`;
 }
-function complianceHtml(c) {
-  const cls = { none: "live", low: "live", medium: "inferred", high: "inferred" }[c.risk_level] || "";
-  return `<div class="banner"><b>Brand check:</b> ${esc(c.summary)} <span class="pill ${cls}">risk: ${esc(c.risk_level||"n/a")}</span>
-    ${(c.issues||[]).length ? "<ul class='small'>" + c.issues.map((x,idx)=>`<li>${esc(x)}${c.fixes&&c.fixes[idx]?` — <i>${esc(c.fixes[idx])}</i>`:""}</li>`).join("") + "</ul>" : ""}</div>`;
+function field(label, val) { return val ? `<div class="fld"><label>${label}</label><div class="val">${nl(val)}</div></div>` : ""; }
+function copyField(label, val) {
+  if (!val) return "";
+  return `<div class="fld copyfield"><label>${label}</label><div class="val">${nl(val)}</div>
+    <button class="btn subtle sm copybtn" data-copy="${esc(val)}">Copy</button></div>`;
 }
-function perfFormHtml(i) {
-  const F = (label, key, type = "number") => `<div><label>${label}</label><input data-perf="${key}" type="${type}"></div>`;
+function wireCopy() {
+  $("#drawer-body").querySelectorAll("[data-copy]").forEach((b) => b.addEventListener("click", () => {
+    navigator.clipboard.writeText(b.dataset.copy); b.textContent = "Copied!"; toast("Copied to clipboard");
+    setTimeout(() => (b.textContent = "Copy"), 1200);
+  }));
+}
+function perfForm(i) {
+  const f = (label, key) => `<div class="fld"><label>${label}</label><input data-perf="${key}" type="number" inputmode="numeric"></div>`;
   return `<div class="form-grid">
-    ${F("Views","views")}${F("Reach","reach")}${F("Likes","likes")}${F("Comments","comments")}
-    ${F("Shares","shares")}${F("Saves","saves")}${F("Avg watch (s)","avg_watch_time_seconds")}${F("Completion %","completion_rate")}
-    ${F("Follower growth","follower_growth")}${F("Profile visits","profile_visits")}${F("Website clicks","website_clicks")}${F("Video length (s)","video_length_seconds")}
-    ${F("Calls","calls")}${F("Messages","messages")}${F("Appointments/visits","appointments")}
-    <div><label>Platform</label><input data-perf="platform" value="${esc(i.platform)}"></div>
-    <div class="full"><label>Notes</label><input data-perf="notes" type="text"></div>
-  </div>
-  <div class="btn-row"><button class="btn primary" id="save-perf">Log performance</button></div>`;
+    ${f("Views", "views")}${f("Shares", "shares")}${f("Saves", "saves")}${f("Comments", "comments")}
+    ${f("Likes", "likes")}${f("Reach", "reach")}${f("Watch % done", "completion_rate")}${f("New followers", "follower_growth")}
+    ${f("Profile visits", "profile_visits")}${f("Website clicks", "website_clicks")}${f("Store calls", "calls")}${f("Messages", "messages")}
+    ${f("Visits/appointments", "appointments")}${f("Video length (sec)", "video_length_seconds")}
+  </div>`;
 }
 
-// -------------------------------------------------------------------------
-// Approvals (scripts waiting) + Published + Calendar
-// -------------------------------------------------------------------------
-async function renderApprovals() {
-  const ideas = await api.get("/api/ideas?status=New");
-  const rev = await api.get("/api/ideas?status=Needs Revision");
-  const all = [...ideas, ...rev];
-  view.innerHTML = "";
-  const c = el(`<div class="card"><h2>Scripts waiting for approval</h2></div>`);
-  if (!all.length) c.appendChild(el(`<p class="muted">Nothing waiting. Everything's reviewed! 🎉</p>`));
-  all.forEach((i) => c.appendChild(ideaRow(i)));
-  view.appendChild(c);
-}
-async function renderPublished() {
-  const ideas = await api.get("/api/ideas?status=Published");
-  view.innerHTML = "";
-  const c = el(`<div class="card"><h2>Published content</h2></div>`);
-  if (!ideas.length) c.appendChild(el(`<p class="muted">Nothing published yet.</p>`));
-  ideas.forEach((i) => c.appendChild(ideaRow(i)));
-  view.appendChild(c);
-}
+/* =====================================================================
+   CALENDAR (Plan)
+   ===================================================================== */
 async function renderCalendar() {
   const events = await api.get("/api/calendar");
   view.innerHTML = "";
-  const c = el(`<div class="card"><h2>Content calendar</h2></div>`);
-  if (!events.length) c.appendChild(el(`<p class="muted">No scheduled recordings or publishes yet. Set record/publish dates on an idea.</p>`));
-  const byDate = {};
-  events.forEach((e) => (byDate[e.date] = byDate[e.date] || []).push(e));
-  const g = el(`<div class="grid"></div>`);
-  Object.keys(byDate).sort().forEach((date) => {
-    const day = el(`<div class="cal-day"><div class="d">${esc(date)}</div></div>`);
-    byDate[date].forEach((e) => {
-      const ev = el(`<div class="cal-ev ${e.type}">${e.type === "record" ? "🎥" : "🚀"} ${esc(e.title)}</div>`);
-      ev.addEventListener("click", () => openIdea(e.idea_id));
-      day.appendChild(ev);
-    });
-    g.appendChild(day);
+  view.appendChild(el(`<h1 class="view-title">Your plan</h1><p class="view-sub">Filming and posting dates you've set on your ideas.</p>`));
+  if (!events.length) {
+    view.appendChild(el(`<div class="card empty"><div class="big">📅</div><h2>Nothing scheduled</h2>
+      <p>Open any idea, tap <b>Schedule & who films it</b>, and pick a film or post date. It'll show up here.</p></div>`));
+    return;
+  }
+  const by = {}; events.forEach((e) => (by[e.date] = by[e.date] || []).push(e));
+  const wrap = el(`<div class="stack"></div>`);
+  Object.keys(by).sort().forEach((date) => {
+    const day = el(`<div class="cal-day"><div class="d">${fmtDate(date)}</div></div>`);
+    by[date].forEach((e) => { const ev = el(`<div class="cal-ev ${e.type}">${e.type === "record" ? "🎥 Film" : "🚀 Post"}: ${esc(e.title)}</div>`); ev.addEventListener("click", () => openIdea(e.idea_id)); day.appendChild(ev); });
+    wrap.appendChild(day);
   });
-  c.appendChild(g);
+  view.appendChild(wrap);
+}
+function fmtDate(s) { try { return new Date(s + "T00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }); } catch { return s; } }
+
+/* =====================================================================
+   RESULTS (analytics + posted)
+   ===================================================================== */
+async function renderResults() {
+  const [a, posted] = await Promise.all([api.get("/api/analytics"), api.get("/api/ideas?status=Published")]);
+  view.innerHTML = "";
+  view.appendChild(el(`<h1 class="view-title">Results & what's working</h1><p class="view-sub">Log the numbers on your posts and your employee learns what to make more of.</p>`));
+
+  if (a.source === "inferred")
+    view.appendChild(el(`<div class="banner info"><span class="bic">💡</span><div>General guidance for now. Log a few posts (open any posted idea → <b>Add the numbers</b>) to unlock advice tailored to your audience.</div></div>`));
+
+  const c = el(`<div class="card"><div class="eyebrow">What's working</div><h3 style="margin:4px 0 8px">${esc(a.headline || "Keep posting and logging")}</h3></div>`);
+  const put = (title, items) => { if (items && items.length) c.appendChild(el(`<div class="fld"><label>${title}</label><ul class="clean small">${items.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>`)); };
+  put("Do more of this", a.recommendations);
+  put("Best hooks", a.best_hooks);
+  put("Formats that win", a.winning_formats);
+  put("Breeds people love", a.best_breeds);
+  put("Drives comments", a.topics_driving_comments);
+  put("Brings people to the store", a.topics_driving_inquiries);
+  put("Series to keep", a.series_to_continue);
+  put("Worth retesting", a.ideas_to_retest);
   view.appendChild(c);
+
+  const pc = el(`<div class="card list-card"><h3 style="padding:12px 0 4px">🚀 Posted content</h3></div>`);
+  if (!posted.length) pc.appendChild(el(`<p class="muted center" style="padding:20px">Nothing posted yet. When you post, open the idea and tap <b>Posted it</b>.</p>`));
+  posted.forEach((i) => pc.appendChild(ideaRow(i)));
+  view.appendChild(pc);
 }
 
-// -------------------------------------------------------------------------
-// Analytics
-// -------------------------------------------------------------------------
-async function renderAnalytics() {
-  const a = await api.get("/api/analytics");
+/* =====================================================================
+   MORE  (+ sub views)
+   ===================================================================== */
+async function renderMore() {
   view.innerHTML = "";
-  const list = (title, items) => (items && items.length)
-    ? `<div class="section"><h3>${title}</h3><ul class="small">${items.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>` : "";
-  view.appendChild(el(`<div class="card">
-    ${sourceBanner(a.source)}
-    <h2>Performance analysis <span class="pill">confidence: ${esc(a.data_confidence||"low")}</span></h2>
-    <p><b>${esc(a.headline||"")}</b></p>
-    ${list("Recommendations", a.recommendations)}
-    ${list("Best hooks", a.best_hooks)}
-    ${list("Best breeds", a.best_breeds)}
-    ${list("Best lengths", a.best_lengths)}
-    ${list("Winning formats", a.winning_formats)}
-    ${list("Topics driving comments", a.topics_driving_comments)}
-    ${list("Topics driving inquiries", a.topics_driving_inquiries)}
-    ${list("Best posting times", a.best_posting_times)}
-    ${list("Series to continue", a.series_to_continue)}
-    ${list("Series to stop", a.series_to_stop)}
-    ${list("Ideas to retest", a.ideas_to_retest)}
-    ${list("Ideas to stop", a.ideas_to_stop)}
+  view.appendChild(el(`<h1 class="view-title">More</h1><p class="view-sub">Your library, settings, and how things work.</p>`));
+  const items = [
+    ["🔁", "Recurring series", "Repeat formats fans follow", () => subView("Recurring series", renderSeries)],
+    ["📈", "Trend research", "What your employee found & when", () => subView("Trend research", renderTrends)],
+    ["🎥", "Inspiration", "Creators & formats we adapt", () => subView("Inspiration", renderInspiration)],
+    ["⚙️", "Brand rules", "The rules your employee follows", () => subView("Brand rules", renderRules)],
+    ["📜", "Activity log", "Every research run", () => subView("Activity log", renderLogs)],
+    ["❓", "How this works", "Setup & tips", () => subView("How this works", renderHelp)],
+  ];
+  const grid = el(`<div class="menu-grid"></div>`);
+  items.forEach(([ic, t, d, fn]) => { const card = el(`<button class="menu-card"><div class="mic">${ic}</div><div class="mt">${t}</div><div class="md">${d}</div></button>`); card.addEventListener("click", fn); grid.appendChild(card); });
+  view.appendChild(grid);
+}
+function subView(title, fn) {
+  view.innerHTML = "";
+  const back = el(`<button class="btn ghost sm" style="margin-bottom:10px">‹ More</button>`);
+  back.addEventListener("click", () => switchTab("more"));
+  view.appendChild(back);
+  view.appendChild(el(`<h1 class="view-title" style="margin-bottom:14px">${title}</h1>`));
+  const holder = el(`<div id="sub"></div>`); view.appendChild(holder);
+  fn(holder);
+}
+
+async function renderSeries(root) {
+  const rows = await api.get("/api/series");
+  const g = el(`<div class="stack"></div>`);
+  rows.forEach((s) => g.appendChild(el(`<div class="card">
+    <h3>${esc(s.name)} ${s.active ? "" : '<span class="chip">paused</span>'}</h3>
+    <div class="fld"><label>Format</label><div class="val">${esc(s.repeatable_format)}</div></div>
+    <div class="fld"><label>Opening hook</label><div class="val">${esc(s.opening_hook)}</div></div>
+    <p class="tiny muted">${esc(s.publishing_frequency)} · ${esc(s.business_goal)}</p>
+  </div>`)));
+  root.appendChild(g);
+}
+async function renderTrends(root) {
+  const rows = await api.get("/api/trends");
+  if (!rows.length) { root.appendChild(el(`<div class="card empty"><div class="big">📈</div><p class="muted">No research yet — tap <b>Get today's plan</b>.</p></div>`)); return; }
+  rows.forEach((t) => root.appendChild(el(`<div class="card">
+    <h3>${esc(t.name)} <span class="chip plat">${platIcon(t.platform)} ${esc(t.platform)}</span> ${t.source === "inferred" ? '<span class="chip">starter</span>' : ""}</h3>
+    <p class="tiny muted">Found ${esc(t.date_discovered)} · best while ${esc(t.expected_lifespan || "—")} · ${esc(t.status)}</p>
+    <p class="small" style="margin-top:6px">${esc(t.description)}</p>
+    <div class="fld"><label>Our version</label><div class="val">${esc(t.adaptation)}</div></div>
+  </div>`)));
+}
+async function renderInspiration(root) {
+  const rows = await api.get("/api/competitors");
+  root.appendChild(el(`<div class="banner info"><span class="bic">🎥</span> Studied for <b>why</b> they work — never copied. We build original puppy versions.</div>`));
+  rows.forEach((x) => root.appendChild(el(`<div class="card">
+    <h3>${esc(x.name)}</h3>
+    <div class="chips" style="margin:6px 0"><span class="chip plat">${esc(x.platform)}</span><span class="chip">${esc(x.format_type)}</span></div>
+    <div class="fld"><label>Why it works</label><div class="val">${esc(x.what_works)}</div></div>
+    <div class="fld"><label>Our adaptation</label><div class="val">${esc(x.adaptation_idea)}</div></div>
+  </div>`)));
+}
+async function renderRules(root) {
+  const r = await api.get("/api/brand-rules");
+  root.appendChild(el(`<p class="small muted" style="margin-bottom:12px">Your employee follows these. Edit a value and save — it applies on the next plan.</p>`));
+  Object.keys(r).forEach((key) => {
+    const val = JSON.stringify(r[key], null, 2);
+    const box = el(`<div class="card"><div class="fld"><label>${esc(key.replace(/_/g, " "))}</label>
+      <textarea style="width:100%;min-height:${Math.min(220, 60 + val.length / 3)}px;font-family:ui-monospace,monospace;font-size:0.82rem">${esc(val)}</textarea></div>
+      <button class="btn sm">Save</button></div>`);
+    box.querySelector("button").addEventListener("click", async () => {
+      let parsed; try { parsed = JSON.parse(box.querySelector("textarea").value); } catch { return toast("That isn't valid — check quotes/commas"); }
+      await api.put("/api/brand-rules", { key, value: parsed }); toast(`Saved ${key.replace(/_/g, " ")}`);
+    });
+    root.appendChild(box);
+  });
+}
+async function renderLogs(root) {
+  const rows = await api.get("/api/logs");
+  if (!rows.length) { root.appendChild(el(`<p class="muted">No runs yet.</p>`)); return; }
+  rows.forEach((l) => root.appendChild(el(`<div class="card" style="padding:12px 16px">
+    <div class="chips"><span class="chip ${l.status === "ok" ? "ok" : ""}">${esc(l.status)}</span>
+    <span class="chip">${esc(l.run_type)}</span><span class="chip">${esc(l.source)}</span></div>
+    <p class="small" style="margin-top:6px">${esc(l.message)}</p>
+    <p class="tiny muted">${esc(l.created_at)} · ${l.trends_found} trends · ${l.ideas_created} ideas</p>
+  </div>`)));
+}
+async function renderHelp(root) {
+  const s = await api.get("/api/status").catch(() => ({}));
+  root.appendChild(el(`<div class="card">
+    <h3>How your social media employee works</h3>
+    <ol class="clean small" style="margin-top:8px">
+      <li>Each morning (or when you tap <b>Get today's plan</b>) it researches what's trending.</li>
+      <li>It hands you the single best video to film today, with the full script, filming steps, caption, hashtags, and titles.</li>
+      <li>You film it, tap <b>Approve</b>, and post it.</li>
+      <li>After a day or two, open the post and tap <b>Add the numbers</b>. It learns and gets better.</li>
+    </ol>
+  </div>
+  <div class="card">
+    <h3>Live research vs starter ideas</h3>
+    <p class="small soft" style="margin-top:6px">Right now you're in <b>${s.ai_enabled ? "Live research" : "Starter ideas"}</b> mode.
+    ${s.ai_enabled ? "It's using live web research." : "It's using dependable evergreen ideas. To switch on live daily trend research, add an Anthropic API key to your <kbd>.env</kbd> file and restart. See the README for step-by-step help."}</p>
+  </div>
+  <div class="card">
+    <h3>Tips</h3>
+    <ul class="clean small" style="margin-top:6px">
+      <li>Keep videos short (10–45 seconds) and end with a friendly reason to visit.</li>
+      <li>Log <b>shares, saves and store calls</b> — they matter more than likes.</li>
+      <li>Not feeling an idea? Open it and tap <b>Shorter</b>, <b>Funnier</b>, or <b>Fresh version</b>.</li>
+    </ul>
   </div>`));
 }
 
-// -------------------------------------------------------------------------
-// Series / Trends / Inspiration / Rules / Logs
-// -------------------------------------------------------------------------
-async function renderSeries() {
-  const rows = await api.get("/api/series");
-  view.innerHTML = "";
-  const c = el(`<div class="card"><h2>Recurring series</h2><p class="muted small">Repeatable formats audiences can recognise and follow.</p><div class="grid"></div></div>`);
-  const g = c.querySelector(".grid");
-  rows.forEach((s) => g.appendChild(el(`<div class="card" style="margin:0">
-    <h3>${esc(s.name)} ${s.active ? "" : '<span class="tag">paused</span>'}</h3>
-    <p class="small"><b>Format:</b> ${esc(s.repeatable_format)}</p>
-    <p class="small"><b>Opening hook:</b> ${esc(s.opening_hook)}</p>
-    <p class="small"><b>How to record:</b> ${esc(s.recording_process)}</p>
-    <p class="small"><b>Frequency:</b> ${esc(s.publishing_frequency)}</p>
-    <p class="small"><b>Why viewers return:</b> ${esc(s.why_return)}</p>
-    <p class="small"><b>How it evolves:</b> ${esc(s.evolution)}</p>
-    <p class="small"><b>Business goal:</b> ${esc(s.business_goal)}</p>
-  </div>`)));
-  view.appendChild(c);
-}
-async function renderTrends() {
-  const rows = await api.get("/api/trends");
-  view.innerHTML = "";
-  const c = el(`<div class="card"><h2>Trend research log</h2><p class="muted small">Each trend records the date it was discovered so old trends aren't treated as current.</p></div>`);
-  if (!rows.length) c.appendChild(el(`<p class="muted">No trends yet. Run research.</p>`));
-  rows.forEach((t) => c.appendChild(el(`<div style="padding:12px 0;border-bottom:1px solid var(--line)">
-    <h3>${esc(t.name)} <span class="tag plat">${esc(t.platform)}</span> <span class="tag ${t.status==='active'?'cat':''}">${esc(t.status)}</span> ${t.source==='inferred'?'<span class="tag type">inferred</span>':''}</h3>
-    <p class="small muted">Found ${esc(t.date_discovered)} · Lifespan ${esc(t.expected_lifespan||"—")} · Difficulty ${esc(t.difficulty)} · ~${esc(t.est_filming_time||"—")}</p>
-    <p class="small">${esc(t.description)}</p>
-    <p class="small"><b>Our version:</b> ${esc(t.adaptation)}</p>
-    <p class="small"><b>Risks:</b> ${esc(t.risks||"none noted")}</p>
-    ${scores(t.virality_score, t.conversion_value)}
-  </div>`)));
-  view.appendChild(c);
-}
-async function renderInspiration() {
-  const rows = await api.get("/api/competitors");
-  view.innerHTML = "";
-  const c = el(`<div class="card"><h2>Competitor & format inspiration</h2><p class="muted small">Studied for why they work — never copied. We adapt the structure into original puppy content.</p><div class="grid"></div></div>`);
-  const g = c.querySelector(".grid");
-  rows.forEach((x) => g.appendChild(el(`<div class="card" style="margin:0">
-    <h3>${esc(x.name)}</h3>
-    <p class="small"><span class="tag plat">${esc(x.platform)}</span> <span class="tag type">${esc(x.format_type)}</span></p>
-    <p class="small"><b>Why it works:</b> ${esc(x.what_works)}</p>
-    <p class="small"><b>Our adaptation:</b> ${esc(x.adaptation_idea)}</p>
-  </div>`)));
-  view.appendChild(c);
-}
-async function renderRules() {
-  const r = await api.get("/api/brand-rules");
-  view.innerHTML = "";
-  const c = el(`<div class="card"><h2>Saved brand rules</h2><p class="muted small">The AI employee follows these. Edit any value and save; it takes effect on the next run.</p></div>`);
-  Object.keys(r).forEach((key) => {
-    const val = JSON.stringify(r[key], null, 2);
-    const box = el(`<div class="section"><h3>${esc(key)}</h3>
-      <textarea style="width:100%;min-height:${Math.min(200, 40 + val.length/3)}px">${esc(val)}</textarea>
-      <div class="btn-row"><button class="btn sm">Save ${esc(key)}</button></div></div>`);
-    box.querySelector("button").addEventListener("click", async () => {
-      let parsed;
-      try { parsed = JSON.parse(box.querySelector("textarea").value); }
-      catch (e) { toast("Invalid JSON"); return; }
-      await api.put("/api/brand-rules", { key, value: parsed });
-      toast(`Saved ${key}`);
-    });
-    c.appendChild(box);
-  });
-  view.appendChild(c);
-}
-async function renderLogs() {
-  const rows = await api.get("/api/logs");
-  view.innerHTML = "";
-  const c = el(`<div class="card"><h2>Activity log</h2></div>`);
-  if (!rows.length) c.appendChild(el(`<p class="muted">No runs yet.</p>`));
-  rows.forEach((l) => c.appendChild(el(`<div style="padding:8px 0;border-bottom:1px solid var(--line)">
-    <span class="tag ${l.status==='ok'?'cat':''}">${esc(l.status)}</span>
-    <span class="tag type">${esc(l.run_type)}</span>
-    <span class="tag ${l.source==='inferred'?'type':'plat'}">${esc(l.source)}</span>
-    <span class="small muted">${esc(l.created_at)}</span>
-    <div class="small">${esc(l.message)} — ${l.trends_found} trends, ${l.ideas_created} ideas</div>
-  </div>`)));
-  view.appendChild(c);
-}
-
-// -------------------------------------------------------------------------
-// Drawer
-// -------------------------------------------------------------------------
+/* ----------------------------------------------------------- drawer */
 function openDrawer(html) {
   $("#drawer-body").innerHTML = html;
-  $("#drawer").hidden = false;
-  $("#drawer-backdrop").hidden = false;
-  // wire copy buttons
-  $("#drawer-body").querySelectorAll("[data-copy]").forEach((b) =>
-    b.addEventListener("click", () => { navigator.clipboard.writeText(b.dataset.copy); toast("Copied"); }));
+  $("#drawer").hidden = false; $("#drawer-backdrop").hidden = false;
+  document.body.style.overflow = "hidden";
 }
-function closeDrawer() { $("#drawer").hidden = true; $("#drawer-backdrop").hidden = true; }
+function closeDrawer() { $("#drawer").hidden = true; $("#drawer-backdrop").hidden = true; document.body.style.overflow = ""; }
 $("#drawer-close").addEventListener("click", closeDrawer);
 $("#drawer-backdrop").addEventListener("click", closeDrawer);
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
 
-// -------------------------------------------------------------------------
-// Boot
-// -------------------------------------------------------------------------
+/* ----------------------------------------------------------- boot */
 loadStatus();
-switchTab("briefing");
+switchTab("today");
 setInterval(loadStatus, 60000);

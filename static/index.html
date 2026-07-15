@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Sugar Sweet Georgia Puppies — Social Media Employee</title>
     <link rel="stylesheet" href="/static/style.css" />
     <link
@@ -14,37 +14,35 @@
     <header class="topbar">
       <div class="brand">
         <span class="paw">🐶</span>
-        <div>
-          <h1>Sugar Sweet Georgia Puppies</h1>
-          <p class="sub">AI Social Media Employee</p>
+        <div class="brand-text">
+          <strong>Sugar Sweet Georgia Puppies</strong>
+          <span class="sub">Your social media employee</span>
         </div>
       </div>
-      <div class="status" id="status">
-        <span class="pill" id="mode-pill">…</span>
-        <button class="btn primary" id="run-research">Run research now</button>
+      <div class="top-actions">
+        <span class="pill" id="mode-pill" title="Research mode">…</span>
+        <button class="btn primary" id="run-research">
+          <span class="ic">✨</span><span class="lbl">Get today's plan</span>
+        </button>
       </div>
     </header>
 
-    <nav class="tabs" id="tabs">
-      <button data-tab="briefing" class="active">Today's Briefing</button>
-      <button data-tab="ideas">Idea Database</button>
-      <button data-tab="approvals">Approvals</button>
-      <button data-tab="calendar">Calendar</button>
-      <button data-tab="published">Published</button>
-      <button data-tab="analytics">Analytics</button>
-      <button data-tab="series">Series</button>
-      <button data-tab="trends">Trends</button>
-      <button data-tab="inspiration">Inspiration</button>
-      <button data-tab="rules">Brand Rules</button>
-      <button data-tab="logs">Activity</button>
+    <main id="view"><div class="skeleton-wrap" id="boot"></div></main>
+
+    <nav class="nav" id="nav">
+      <button data-tab="today" class="active"><span>🐶</span>Today</button>
+      <button data-tab="ideas"><span>💡</span>Ideas</button>
+      <button data-tab="calendar"><span>📅</span>Plan</button>
+      <button data-tab="results"><span>📊</span>Results</button>
+      <button data-tab="more"><span>⋯</span>More</button>
     </nav>
 
-    <main id="view"><div class="loading">Loading…</div></main>
-
-    <!-- Idea detail drawer -->
+    <!-- Slide-over drawer for an idea's full detail -->
     <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
-    <aside class="drawer" id="drawer" hidden>
-      <button class="drawer-close" id="drawer-close">✕</button>
+    <aside class="drawer" id="drawer" hidden aria-modal="true" role="dialog">
+      <div class="drawer-head">
+        <button class="icon-btn" id="drawer-close" aria-label="Close">✕</button>
+      </div>
       <div id="drawer-body"></div>
     </aside>
 
