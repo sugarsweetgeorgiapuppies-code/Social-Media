@@ -345,6 +345,15 @@ textarea { min-height: 70px; resize: vertical; }
   border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ---------- Chat bubbles ---------- */
+.bubble {
+  max-width: 88%; padding: 11px 14px; border-radius: 16px; font-size: 0.92rem;
+  line-height: 1.45; box-shadow: var(--shadow-sm); word-break: break-word;
+}
+.bubble.me { margin-left: auto; background: var(--brand); color: #fff; border-bottom-right-radius: 5px; }
+.bubble.bot { margin-right: auto; background: var(--panel); border: 1px solid var(--line); color: var(--ink); border-bottom-left-radius: 5px; }
+.bubble.bot .chip.ok { background: var(--accent-tint); color: var(--accent); }
+
 kbd { background: var(--line); padding: 1px 6px; border-radius: 5px; font-size: 0.8em; font-family: ui-monospace, monospace; }
 a { color: var(--brand-dark); }
 ul.clean { margin: 0; padding-left: 18px; }

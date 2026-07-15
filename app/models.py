@@ -270,6 +270,18 @@ class ResearchLog(Base):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=_now, index=True)
 
 
+class ConversationMessage(Base):
+    """Chat history between the owner and the AI employee."""
+
+    __tablename__ = "conversation"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    role: Mapped[str] = mapped_column(String(20))  # user | assistant
+    content: Mapped[str] = mapped_column(Text, default="")
+    actions: Mapped[list] = mapped_column(JSON, default=list)  # things the employee did
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=_now, index=True)
+
+
 class Competitor(Base):
     """Creators / businesses whose formats inspire adaptations."""
 

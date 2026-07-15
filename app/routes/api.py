@@ -26,15 +26,25 @@ from ..models import (
 )
 from ..schemas import (
     BrandRuleUpdate,
+    ChatSend,
     FeedbackCreate,
     IdeaAction,
     IdeaCreate,
     IdeaUpdate,
     PerformanceCreate,
+    PlanWeek,
     SeriesUpsert,
 )
 from ..seed import brand_rules_dict
-from ..services import analytics, briefing as briefing_svc, dedup, ideas as ideas_svc
+from ..ai import employee as employee_ai
+from ..services import (
+    analytics,
+    briefing as briefing_svc,
+    dedup,
+    ideas as ideas_svc,
+    planner as planner_svc,
+    tasks as tasks_svc,
+)
 from ..services.ideas import compute_priority
 from . import serializers as ser
 
@@ -78,6 +88,40 @@ def run_research(db: Session = Depends(get_db)):
     brief = briefing_svc.run_daily_workflow(db, run_type="manual")
     db.commit()
     return _assemble_briefing(db, brief)
+
+
+# --------------------------------------------------------------------------- #
+# Employee: standup / tasks, weekly plan, and chat
+# --------------------------------------------------------------------------- #
+@router.get("/tasks")
+def tasks(db: Session = Depends(get_db)):
+    return tasks_svc.build_tasks(db)
+
+
+@router.post("/plan/week")
+def plan_week(body: PlanWeek, db: Session = Depends(get_db)):
+    plan = planner_svc.plan_week(db, start_date=body.start_date, posts=body.posts)
+    db.commit()
+    return plan
+
+
+@router.get("/chat")
+def chat_history(db: Session = Depends(get_db)):
+    return {"messages": employee_ai.history(db), "ai_enabled": ai_client.enabled}
+
+
+@router.post("/chat")
+def chat_send(body: ChatSend, db: Session = Depends(get_db)):
+    result = employee_ai.chat(db, body.message)
+    db.commit()
+    return result
+
+
+@router.delete("/chat")
+def chat_clear(db: Session = Depends(get_db)):
+    employee_ai.clear_history(db)
+    db.commit()
+    return {"ok": True}
 
 
 @router.get("/briefing/today")

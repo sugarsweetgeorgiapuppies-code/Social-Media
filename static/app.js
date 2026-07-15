@@ -58,7 +58,7 @@ async function runResearch() {
 function setRunLabel() { $("#run-research .lbl").textContent = BRIEFING_EXISTS ? "Refresh plan" : "Get today's plan"; }
 
 /* ----------------------------------------------------------------- nav */
-const TABS = { today: renderToday, ideas: renderIdeas, calendar: renderCalendar, results: renderResults, more: renderMore };
+const TABS = { today: renderToday, chat: renderChat, ideas: renderIdeas, calendar: renderCalendar, results: renderResults, more: renderMore };
 $("#nav").addEventListener("click", (e) => { const b = e.target.closest("button[data-tab]"); if (b) switchTab(b.dataset.tab); });
 function switchTab(tab) {
   CURRENT = tab;
@@ -96,17 +96,18 @@ function ideaRow(i) {
    TODAY
    ===================================================================== */
 async function renderToday() {
-  const b = await api.get("/api/briefing/today");
+  const [b, tasks] = await Promise.all([api.get("/api/briefing/today"), api.get("/api/tasks").catch(() => null)]);
   BRIEFING_EXISTS = b.exists; setRunLabel();
 
   if (!b.exists) {
     view.innerHTML = "";
+    if (tasks) view.appendChild(standupCard(tasks));
     view.appendChild(el(`<div class="card pad-lg empty">
       <div class="big">🐶</div>
       <h2>Good morning!</h2>
       <p>Tap the button and your social media employee will research today's trends and hand you a ready-to-film video plan.</p>
       <button class="btn primary block" id="go-plan"><span class="ic">✨</span> Get today's plan</button>
-      <p class="tiny" style="margin-top:14px">Takes a few seconds. You can do this any time.</p>
+      <p class="tiny" style="margin-top:14px">Or open <b>Ask</b> and just tell me what you need.</p>
     </div>`));
     $("#go-plan").addEventListener("click", runResearch);
     return;
@@ -114,6 +115,8 @@ async function renderToday() {
 
   const brf = b.briefing, d = brf.data, p = b.primary_idea;
   const frag = document.createDocumentFragment();
+
+  if (tasks) frag.appendChild(standupCard(tasks));
 
   frag.appendChild(el(`<div class="stack" style="margin-bottom:14px">
     <div class="eyebrow">Your briefing · ${esc(brf.date)}</div>
@@ -184,6 +187,101 @@ function bulletCard(title, sub, items, icon) {
   (items || []).forEach((x) => ul.appendChild(el(`<li>${icon} ${esc(x)}</li>`)));
   if (!items || !items.length) ul.appendChild(el(`<li class="muted">Nothing here yet.</li>`));
   return c;
+}
+
+/* A short "from your employee" standup with what needs the owner. */
+function standupCard(t) {
+  const c = el(`<div class="card" style="border-color:var(--line-2)">
+    <div style="display:flex;gap:10px;align-items:flex-start">
+      <div class="avatar" style="background:var(--brand-tint)">🐶</div>
+      <div style="flex:1">
+        <div class="eyebrow">From your employee</div>
+        <p class="small soft" style="margin-top:4px">${esc(t.message || "")}</p>
+      </div>
+    </div>
+    <div class="btn-row" id="task-row" style="margin-top:12px"></div>
+  </div>`);
+  const row = c.querySelector("#task-row");
+  (t.tasks || []).forEach((task) => {
+    const btn = el(`<button class="btn subtle sm">${esc(task.label)} ›</button>`);
+    btn.addEventListener("click", () => {
+      if (task.key === "plan") return runResearch();
+      switchTab(task.tab || "ideas");
+    });
+    row.appendChild(btn);
+  });
+  const ask = el(`<button class="btn ghost sm">💬 Ask me anything</button>`);
+  ask.addEventListener("click", () => switchTab("chat"));
+  row.appendChild(ask);
+  return c;
+}
+
+/* =====================================================================
+   CHAT — talk to your employee
+   ===================================================================== */
+const CHAT_SUGGESTIONS = [
+  "Plan my week", "What should I post today?", "Write a caption about Maltipoos",
+  "Draft 3 friendly replies to comments", "A customer asked if Yorkies are good for apartments",
+];
+async function renderChat() {
+  view.innerHTML = "";
+  const data = await api.get("/api/chat");
+  view.appendChild(el(`<h1 class="view-title">Ask your employee</h1>
+    <p class="view-sub">Tell me what you need — I can plan, write scripts and captions, draft comment replies, answer customer questions, and more.</p>`));
+  if (!data.ai_enabled)
+    view.appendChild(el(`<div class="banner info"><span class="bic">💡</span><div>Basic commands like <b>“Plan my week”</b> and <b>“Get today's plan”</b> work now. Add an API key for full back-and-forth conversation.</div></div>`));
+
+  const log = el(`<div id="chat-log" class="stack" style="margin-bottom:14px"></div>`);
+  view.appendChild(log);
+
+  const chips = el(`<div class="chips" style="margin-bottom:10px" id="sugg"></div>`);
+  CHAT_SUGGESTIONS.forEach((s) => { const b = el(`<button class="chip" style="cursor:pointer;border:none">${esc(s)}</button>`); b.addEventListener("click", () => send(s)); chips.appendChild(b); });
+  view.appendChild(chips);
+
+  const bar = el(`<div class="search" style="align-items:flex-end;gap:8px">
+    <textarea id="chat-input" rows="1" placeholder="Type a message…" style="border:none;background:transparent;color:var(--ink);width:100%;outline:none;resize:none;font-size:0.95rem;max-height:120px"></textarea>
+    <button class="btn primary sm" id="chat-send">Send</button>
+  </div>`);
+  view.appendChild(bar);
+  view.appendChild(el(`<button class="btn ghost sm" id="chat-clear" style="margin-top:8px">Clear conversation</button>`));
+
+  const input = $("#chat-input");
+  input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = Math.min(120, input.scrollHeight) + "px"; });
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input.value); } });
+  $("#chat-send").addEventListener("click", () => send(input.value));
+  $("#chat-clear").addEventListener("click", async () => { await fetch("/api/chat", { method: "DELETE" }); renderChat(); });
+
+  function paint(messages) {
+    log.innerHTML = "";
+    if (!messages.length)
+      log.appendChild(el(`<div class="card center" style="padding:22px"><div style="font-size:1.8rem">🐶</div><p class="small muted" style="margin-top:8px">Hi! What can I help you with today? Try a suggestion below.</p></div>`));
+    messages.forEach((mm) => log.appendChild(bubble(mm)));
+    window.scrollTo(0, document.body.scrollHeight);
+  }
+  paint(data.messages);
+
+  let busy = false;
+  async function send(text) {
+    text = (text || "").trim(); if (!text || busy) return;
+    busy = true; input.value = ""; input.style.height = "auto";
+    log.appendChild(bubble({ role: "user", content: text }));
+    const thinking = el(`<div class="bubble bot"><span class="spinner" style="border-color:rgba(0,0,0,.2);border-top-color:var(--brand)"></span> thinking…</div>`);
+    log.appendChild(thinking); window.scrollTo(0, document.body.scrollHeight);
+    try {
+      const r = await api.post("/api/chat", { message: text });
+      thinking.remove();
+      log.appendChild(bubble({ role: "assistant", content: r.reply, actions: r.actions }));
+      window.scrollTo(0, document.body.scrollHeight);
+      loadStatus();
+    } catch (e) { thinking.remove(); log.appendChild(bubble({ role: "assistant", content: "Sorry, that didn't go through: " + e.message })); }
+    finally { busy = false; }
+  }
+}
+function bubble(m) {
+  const isUser = m.role === "user";
+  const actions = (m.actions && m.actions.length)
+    ? `<div class="chips" style="margin-top:8px">${m.actions.map((a) => `<span class="chip ok">✅ ${esc(a)}</span>`).join("")}</div>` : "";
+  return el(`<div class="bubble ${isUser ? "me" : "bot"}">${nl(m.content)}${actions}</div>`);
 }
 
 /* =====================================================================
@@ -413,10 +511,23 @@ function perfForm(i) {
 async function renderCalendar() {
   const events = await api.get("/api/calendar");
   view.innerHTML = "";
-  view.appendChild(el(`<h1 class="view-title">Your plan</h1><p class="view-sub">Filming and posting dates you've set on your ideas.</p>`));
+  view.appendChild(el(`<h1 class="view-title">Your plan</h1><p class="view-sub">Your filming and posting schedule. Let me lay out a whole week for you.</p>`));
+
+  const planCard = el(`<div class="card" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <div style="flex:1;min-width:160px"><b>Plan my week</b><div class="tiny muted">I'll pick your best ideas, write the scripts, and schedule ${""}them.</div></div>
+    <select id="pw-count" class="sm"><option value="3">3 posts</option><option value="5" selected>5 posts</option><option value="7">7 posts</option></select>
+    <button class="btn primary sm" id="pw-go"><span class="ic">🗓️</span> Plan it</button>
+  </div>`);
+  view.appendChild(planCard);
+  $("#pw-go").addEventListener("click", async () => {
+    const btn = $("#pw-go"); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Planning…';
+    try { const r = await api.post("/api/plan/week", { posts: +$("#pw-count").value }); toast(`🗓️ Scheduled ${r.count} posts`); renderCalendar(); }
+    catch (e) { toast("Couldn't plan: " + e.message); btn.disabled = false; btn.innerHTML = "🗓️ Plan it"; }
+  });
+
   if (!events.length) {
-    view.appendChild(el(`<div class="card empty"><div class="big">📅</div><h2>Nothing scheduled</h2>
-      <p>Open any idea, tap <b>Schedule & who films it</b>, and pick a film or post date. It'll show up here.</p></div>`));
+    view.appendChild(el(`<div class="card empty"><div class="big">📅</div><h2>Nothing scheduled yet</h2>
+      <p>Tap <b>Plan it</b> above and I'll fill your week — or set dates on any idea.</p></div>`));
     return;
   }
   const by = {}; events.forEach((e) => (by[e.date] = by[e.date] || []).push(e));

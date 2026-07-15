@@ -93,3 +93,12 @@ class BrandRuleUpdate(BaseModel):
 
 class FeedbackCreate(BaseModel):
     note: str
+
+
+class ChatSend(BaseModel):
+    message: str
+
+
+class PlanWeek(BaseModel):
+    posts: int = 5
+    start_date: dt.date | None = None

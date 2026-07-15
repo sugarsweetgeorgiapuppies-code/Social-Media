@@ -18,6 +18,16 @@ from results to improve tomorrow's recommendations.
 
 ## What it does
 
+- **Talks with you like a coworker (Ask tab).** Tell it what you need in plain
+  English — "plan my week," "write a caption about Maltipoos," "draft three
+  friendly replies to comments," "a customer asked if Yorkies are good for
+  apartments" — and it either answers on the spot or *does the work* (it can
+  research, plan, create ideas, and write full scripts through the chat).
+- **Plans your whole week.** One tap lays out a real day-by-day posting schedule
+  — picking your best ideas, writing their scripts, and filling your calendar.
+- **Gives you a morning standup.** The Today screen opens with a short note from
+  your employee — what's ready and what needs you (approvals, videos to film,
+  numbers to log) — with buttons that take you straight there.
 - **Researches trends daily** across TikTok, Instagram Reels, YouTube Shorts,
   puppy/small-dog content, viral small- and local-business content, hooks,
   trending questions, seasonal + Georgia-local moments — using Claude's
