@@ -20,14 +20,13 @@ import os
 from pathlib import Path
 from typing import Callable, List, Optional, Sequence, Tuple
 
-from . import captions as captions_mod
 from . import music as music_mod
 from . import silence as silence_mod
+from . import textrender
 from .config import resolve_path
 from .ffmpeg_utils import (
     ProbeInfo,
     ensure_ffmpeg,
-    hex_to_ffmpeg,
     probe,
     run,
 )
@@ -39,29 +38,6 @@ ProgressCb = Callable[[int, str], None]
 
 def _noop(pct: int, stage: str) -> None:  # default progress sink
     pass
-
-
-# fonts bundled with the project, keyed by weight
-_WEIGHT_FILE = {
-    800: "Montserrat-ExtraBold.ttf",
-    700: "Montserrat-Bold.ttf",
-}
-
-
-def _font_file(fonts_dir: Path, weight: int) -> str:
-    fname = _WEIGHT_FILE.get(int(weight))
-    if fname and (fonts_dir / fname).exists():
-        return str(fonts_dir / fname)
-    # fall back to whichever bundled font exists
-    for fname in ("Montserrat-ExtraBold.ttf", "Montserrat-Bold.ttf"):
-        if (fonts_dir / fname).exists():
-            return str(fonts_dir / fname)
-    return "Montserrat"  # let fontconfig resolve by name
-
-
-def _ff_escape_path(p: str) -> str:
-    """Escape a path for use inside an ffmpeg filter option value."""
-    return p.replace("\\", "/").replace(":", "\\:")
 
 
 # ---------------------------------------------------------------------------
@@ -177,22 +153,19 @@ def render_video(
         cut_path = str(work / "cut.mp4")
         _apply_cuts(source_path, cut_path, keeps, info.has_audio, FPS, log_path)
 
-    # ---- 6) captions .ass --------------------------------------------------
-    ass_path = None
+    # ---- 6) captions overlay track (rendered by Pillow, not libass) --------
+    caption_list = None
     if words:
         progress(56, "captions")
-        ass_text = captions_mod.build_ass(words, cfg["captions"], W, H)
-        ass_path = str(work / "captions.ass")
-        with open(ass_path, "w", encoding="utf-8") as fh:
-            fh.write(ass_text)
+        caption_list = textrender.build_caption_track(words, cfg["captions"], fonts_dir, W, H, work)
 
     # ---- 7) video pass (reframe + zoom + captions + watermark) -------------
     progress(60, "video")
     video_only = str(work / "video.mp4")
-    _video_pass(cut_path, video_only, cfg, W, H, FPS, cut_duration, keeps, ass_path, fonts_dir, work, log_path)
+    _video_pass(cut_path, video_only, cfg, W, H, FPS, cut_duration, keeps, caption_list, fonts_dir, work, log_path)
     applied["zoom"] = bool(cfg["zoom"].get("enabled"))
     applied["watermark"] = bool(cfg["watermark"].get("enabled"))
-    applied["captions"] = ass_path is not None
+    applied["captions"] = caption_list is not None
 
     # ---- 8) audio pass (voice + ducked music) ------------------------------
     progress(86, "audio")
@@ -283,51 +256,54 @@ def _zoompan_expr(cfg: dict, duration: float, fps: int, keeps: Sequence[Segment]
     return expr
 
 
-def _video_pass(src, dst, cfg, W, H, FPS, duration, keeps, ass_path, fonts_dir, work, log_path):
-    """Reframe to vertical, add motion, burn captions, stamp watermark."""
-    chain = [
+def _video_pass(src, dst, cfg, W, H, FPS, duration, keeps, caption_list, fonts_dir, work, log_path):
+    """Reframe to vertical, add motion, then composite caption + watermark PNGs.
+
+    Text is drawn by Pillow into transparent overlays (see textrender), so this
+    works on FFmpeg builds without libass/freetype.
+    """
+    # base video chain (no text): reframe + optional zoom
+    base = [
         f"fps={FPS}",
         f"scale={W}:{H}:force_original_aspect_ratio=increase",
         f"crop={W}:{H}",
     ]
-
     if cfg["zoom"].get("enabled"):
         expr = _zoompan_expr(cfg, duration, FPS, keeps)
-        chain.append(
+        base.append(
             f"zoompan=z='{expr}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
             f":d=1:s={W}x{H}:fps={FPS}"
         )
+    base.append("setsar=1")  # square pixels (zoompan can emit odd SAR)
 
-    if ass_path:
-        ass_esc = _ff_escape_path(ass_path)
-        fonts_esc = _ff_escape_path(str(fonts_dir))
-        chain.append(f"ass=filename={ass_esc}:fontsdir={fonts_esc}")
+    inputs = ["-i", src]
+    fc = f"[0:v]{','.join(base)}[base]"
+    last = "base"
+    idx = 1
 
+    # caption overlay track (a concat of transparent PNGs)
+    if caption_list:
+        inputs += ["-f", "concat", "-safe", "0", "-i", caption_list]
+        fc += f";[{idx}:v]fps={FPS},format=rgba[cap];[{last}][cap]overlay=0:0:eof_action=pass:shortest=0[vc]"
+        last = "vc"
+        idx += 1
+
+    # watermark overlay (single static PNG)
     wm = cfg["watermark"]
     if wm.get("enabled") and wm.get("text"):
-        wm_file = work / "watermark.txt"
-        wm_file.write_text(str(wm["text"]), encoding="utf-8")
-        font = _font_file(fonts_dir, wm.get("font_weight", 700))
-        y = f"h*{float(wm.get('position_y_pct', 0.045))}"
-        fill = hex_to_ffmpeg(wm.get("fill_color", "#ffffff"))
-        stroke = hex_to_ffmpeg(wm.get("stroke_color", "#1a1a1a"))
-        chain.append(
-            f"drawtext=fontfile={_ff_escape_path(font)}"
-            f":textfile={_ff_escape_path(str(wm_file))}"
-            f":fontcolor={fill}@{float(wm.get('opacity', 0.88))}"
-            f":fontsize={int(wm.get('font_size', 34))}"
-            f":borderw={int(wm.get('stroke_width', 2))}:bordercolor={stroke}"
-            f":x=(w-text_w)/2:y={y}"
-        )
+        wm_png = work / "watermark.png"
+        textrender.render_watermark(wm, fonts_dir, W, H, wm_png)
+        inputs += ["-loop", "1", "-i", str(wm_png)]
+        fc += f";[{last}][{idx}:v]overlay=0:0:eof_action=pass[vw]"
+        last = "vw"
+        idx += 1
 
-    chain.append("setsar=1")  # square pixels (zoompan can emit odd SAR)
-    vf = ",".join(chain)
     o = cfg["output"]
     run([
-        "ffmpeg", "-y", "-i", src, "-vf", vf, "-an",
+        "ffmpeg", "-y", *inputs, "-filter_complex", fc, "-map", f"[{last}]", "-an",
         "-c:v", o.get("video_codec", "libx264"), "-crf", str(o.get("crf", 20)),
         "-preset", o.get("preset", "medium"), "-pix_fmt", o.get("pixel_format", "yuv420p"),
-        "-r", str(FPS), dst,
+        "-r", str(FPS), "-t", f"{duration:.3f}", dst,
     ], log_path)
 
 
@@ -398,49 +374,18 @@ def _audio_pass(cut_path, dst, cfg, duration, has_voice, work, job_id, log_path)
 
 
 def _build_cta_card(dst, cfg, W, H, FPS, fonts_dir, work, log_path):
-    """Render the optional outro card as its own short clip (with silent audio)."""
+    """Render the optional outro card (Pillow PNG) as its own short clip."""
     cta = cfg["cta"]
     dur = float(cta.get("duration", 1.8))
-    bg = hex_to_ffmpeg(cta.get("background", "#1a1a1a"))
-    font = _font_file(fonts_dir, cta.get("font_weight", 800))
-    fesc = _ff_escape_path(font)
+    card_png = work / "cta.png"
+    textrender.render_cta_card(cta, fonts_dir, W, H, card_png)
 
-    def fit(text: str, size: int) -> int:
-        """Shrink the font so the line fits ~92% of the frame width."""
-        if not text:
-            return size
-        # ExtraBold glyphs average ~0.60em wide; keep some side padding
-        max_w = W * 0.92
-        est = len(text) * size * 0.60
-        if est > max_w:
-            size = int(max_w / (len(text) * 0.60))
-        return max(28, size)
-
-    def draw(text_key, size, color, y_expr):
-        text = str(cta.get(text_key, "") or "")
-        if not text:
-            return None
-        size = fit(text, size)
-        fpath = work / f"cta_{text_key}.txt"
-        fpath.write_text(text, encoding="utf-8")
-        return (
-            f"drawtext=fontfile={fesc}:textfile={_ff_escape_path(str(fpath))}"
-            f":fontcolor={hex_to_ffmpeg(color)}:fontsize={size}"
-            f":x=(w-text_w)/2:y={y_expr}"
-        )
-
-    layers = [
-        draw("title", int(cta.get("title_size", 76)), cta.get("title_color", "#ffffff"), "h*0.40-text_h/2"),
-        draw("subtitle", int(cta.get("subtitle_size", 46)), cta.get("title_color", "#ffffff"), "h*0.52"),
-        draw("phone", int(cta.get("phone_size", 64)), cta.get("accent_color", "#ffd24a"), "h*0.62"),
-    ]
-    vf = ",".join([l for l in layers if l]) or "null"
     o = cfg["output"]
     run([
         "ffmpeg", "-y",
-        "-f", "lavfi", "-i", f"color=c={bg}:s={W}x{H}:r={FPS}:d={dur}",
-        "-f", "lavfi", "-i", f"anullsrc=channel_layout=stereo:sample_rate=44100",
-        "-vf", vf, "-t", f"{dur}",
+        "-loop", "1", "-t", f"{dur}", "-i", str(card_png),
+        "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+        "-t", f"{dur}",
         "-c:v", o.get("video_codec", "libx264"), "-crf", str(o.get("crf", 20)),
         "-preset", o.get("preset", "medium"), "-pix_fmt", o.get("pixel_format", "yuv420p"),
         "-c:a", "aac", "-b:a", "128k", "-r", str(FPS), dst,

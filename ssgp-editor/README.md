@@ -66,6 +66,11 @@ pip install -r requirements.txt
 > The first render that needs captions downloads the Whisper model once
 > (`base` ≈ 150 MB) to your HuggingFace cache, then reuses it offline. Fonts
 > (Montserrat 700/800) are bundled in `fonts/`.
+>
+> **Any FFmpeg build works.** All text (captions, watermark, CTA) is drawn with
+> Pillow and composited via FFmpeg's `overlay` filter, so you do **not** need an
+> FFmpeg compiled with `libass`/`freetype` (the default Homebrew build omits
+> them). Nothing extra to install.
 
 ### c) Add music (optional)
 
