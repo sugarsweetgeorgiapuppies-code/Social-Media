@@ -1,0 +1,145 @@
+# ============================================================================
+#  SSGP Editor — configuration
+#  Every editing setting lives here. Change these and re-render; no code edits.
+#  These are the DEFAULTS. Any value can be overridden per-job by the API
+#  ("options" in POST /render) or by the sliders/toggles in the web UI.
+# ============================================================================
+
+# ---------------------------------------------------------------------------
+# Output video format. These match what Instagram / TikTok / YouTube Shorts
+# want for a vertical Reel, and they also re-encode iPhone HEVC into H.264.
+# ---------------------------------------------------------------------------
+output:
+  width: 1080          # px  — 9:16 vertical
+  height: 1920         # px
+  fps: 30              # frames per second
+  video_codec: libx264 # H.264
+  pixel_format: yuv420p # max compatibility (fixes iPhone HEVC issue)
+  crf: 20              # quality: lower = better/bigger (18-23 is a good range)
+  preset: medium       # x264 speed/size tradeoff (ultrafast..veryslow)
+  audio_bitrate: 192k
+  faststart: true      # move moov atom to front so it streams/plays instantly
+
+# ---------------------------------------------------------------------------
+# 1) AUTO CUTS — remove dead air / long silences so the clip stays tight.
+#    We detect silence, then collapse any gap longer than `min_gap` down to a
+#    short natural pause. `keep_pad` is left on BOTH sides of every cut so we
+#    never clip the start or end of a spoken word.
+# ---------------------------------------------------------------------------
+cuts:
+  enabled: true
+  silence_threshold_db: -30   # quieter than this counts as "silence" (dB). More negative = stricter (only very quiet counts as silence).
+  min_gap: 0.6                # seconds — only silences LONGER than this get trimmed
+  keep_pad: 0.15              # seconds of audio kept on each side of a cut (word-safety padding)
+  min_segment: 0.20           # seconds — drop tiny leftover slivers shorter than this
+  max_removed_per_gap: null   # optional cap (seconds) on how much a single gap may be shortened; null = no cap
+
+# ---------------------------------------------------------------------------
+# 2) AUTO CAPTIONS — transcribe locally with faster-whisper, then burn in
+#    animated word-by-word captions. No API key, runs on your machine.
+# ---------------------------------------------------------------------------
+captions:
+  enabled: true
+
+  # --- transcription (faster-whisper) ---
+  model: base                 # tiny | base | small | medium | large-v3  (bigger = more accurate + slower)
+  language: null              # e.g. "en" to force English; null = auto-detect
+  compute_type: int8          # int8 (fast, CPU) | int8_float16 | float16 (GPU) | float32
+  device: auto                # auto | cpu | cuda
+  beam_size: 5
+
+  # --- look & feel (matches the SSGP brand) ---
+  font: Montserrat            # font family name
+  font_weight: 800            # 800 = ExtraBold (maps to fonts/Montserrat-ExtraBold.ttf)
+  font_size: 78               # px at 1080-wide frame
+  fill_color: "#ffffff"       # white text
+  stroke_color: "#1a1a1a"     # dark outline
+  stroke_width: 6             # px outline thickness
+  shadow: 2                   # px drop shadow (0 = off)
+
+  # active-word highlight effect (the word being spoken pops)
+  highlight_color: "#ffd24a"  # colour of the active word; set equal to fill_color for a white-only pop
+  highlight_scale: 1.14       # active word is scaled up this much (1.0 = no size change)
+
+  # layout
+  position_pct: 0.74          # vertical position of the caption baseline (0=top, 1=bottom). 0.74 = lower third.
+  width_pct: 0.84             # captions use ~84% of frame width
+  max_chars_per_line: 22      # wrap a caption line at ~22 characters
+  uppercase: false            # set true for ALL-CAPS captions
+  line_pause: 0.7             # seconds of silence that forces a new caption line
+
+# ---------------------------------------------------------------------------
+# 3) AUTO ZOOM / PUNCH-IN — subtle motion so the clip never feels static.
+#    A slow Ken Burns push-in across the whole clip, plus a gentle quick
+#    punch on each cut. Keep it tasteful — default is deliberately subtle.
+# ---------------------------------------------------------------------------
+zoom:
+  enabled: true
+  intensity: 0.06     # total Ken Burns push over the clip (0.06 = zoom to +6%). Try 0.03 (barely) .. 0.12 (strong).
+  punch_on_cuts: true # add a quick zoom bump at each cut
+  punch_amount: 0.045 # how hard the punch hits (added zoom)
+  punch_decay: 0.45   # seconds for a punch to ease back out
+
+# ---------------------------------------------------------------------------
+# 4) BACKGROUND MUSIC — mix a bed from the /music folder, ducked under Phil's
+#    voice so speech stays clearly audible.
+# ---------------------------------------------------------------------------
+music:
+  enabled: true
+  folder: music              # where your .mp3/.m4a/.wav beds live
+  track: null                # exact filename to use, e.g. "bed1.mp3"; null = pick per `selection`
+  selection: random          # random | first | alphabetical  (used when track is null)
+  volume: 0.18               # base music level (0..1) BEFORE ducking. 0.18 ≈ background level.
+  duck_under_speech_db: -18  # music is pushed at least this far under the voice while Phil talks
+  duck_attack: 5             # ms — how fast music drops when speech starts
+  duck_release: 300          # ms — how fast music comes back when speech stops
+  fade_in: 0.5               # seconds
+  fade_out: 0.8              # seconds
+
+# ---------------------------------------------------------------------------
+# 5) WATERMARK — persistent small text near the top.
+# ---------------------------------------------------------------------------
+watermark:
+  enabled: true
+  text: "Sugar Sweet Georgia Puppies · Lawrenceville, GA"
+  font_weight: 700           # 700 = Bold (maps to fonts/Montserrat-Bold.ttf)
+  font_size: 34
+  fill_color: "#ffffff"
+  stroke_color: "#1a1a1a"
+  stroke_width: 2            # thin dark stroke
+  opacity: 0.88             # ~88%
+  position_y_pct: 0.045     # distance from the top as a fraction of height
+
+# ---------------------------------------------------------------------------
+# 6) CTA END CARD — optional 1.5–2s outro. OFF by default so a render never
+#    breaks if the text isn't set.
+# ---------------------------------------------------------------------------
+cta:
+  enabled: false
+  duration: 1.8              # seconds (1.5–2.0 recommended)
+  background: "#1a1a1a"      # card background colour
+  title: "Come meet our puppies"
+  subtitle: "Lawrenceville, GA"
+  phone: "(678) 253-4081"
+  title_color: "#ffffff"
+  accent_color: "#ffd24a"    # colour for the phone number
+  font_weight: 800
+  title_size: 76             # auto-shrinks further if the title is very long
+  subtitle_size: 46
+  phone_size: 64
+
+# ---------------------------------------------------------------------------
+# Folders + server. Sources are downloaded to `work` and cleaned up after;
+# finished renders land in `output` and are served at /files/{id}.mp4
+# ---------------------------------------------------------------------------
+paths:
+  work_dir: work
+  output_dir: output
+  fonts_dir: fonts
+
+server:
+  host: 0.0.0.0
+  port: 8080
+  cleanup_work: true         # delete the per-job work folder after a successful render
+  keep_failed_work: true     # keep work files when a render fails (for debugging)
+  max_upload_mb: 2048        # reject direct uploads larger than this

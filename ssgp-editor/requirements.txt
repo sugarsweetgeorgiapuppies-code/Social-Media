@@ -1,0 +1,11 @@
+# SSGP Editor — Python dependencies
+# Core web + async worker are pure-Python. Video/audio work is done by the
+# system FFmpeg binary (installed separately — see README). Transcription is
+# done locally by faster-whisper (no API key).
+
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9   # file uploads on FastAPI
+pyyaml>=6.0.1             # config.yaml
+requests>=2.31.0          # fetch source video from a URL (incl. Google Drive)
+faster-whisper>=1.0.3     # local speech-to-text with word timestamps

@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SSGP Editor</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a;
+    --text:#eef1f6; --muted:#9aa3b2; --accent:#ffd24a; --accent2:#7c9cff;
+    --ok:#37d67a; --err:#ff6b6b; --radius:14px;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.5;
+  }
+  header {
+    padding:22px 28px; border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:12px;
+  }
+  header .logo { font-size:26px; }
+  header h1 { font-size:18px; margin:0; font-weight:800; letter-spacing:.2px; }
+  header .sub { color:var(--muted); font-size:13px; margin-left:auto; }
+  .wrap { max-width:1080px; margin:0 auto; padding:24px 20px 80px; }
+  .grid { display:grid; grid-template-columns:1fr 380px; gap:22px; align-items:start; }
+  @media (max-width:900px){ .grid{ grid-template-columns:1fr; } }
+  .card {
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:var(--radius); padding:18px 18px;
+  }
+  .card h2 { font-size:14px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:0 0 14px; }
+  label { display:block; font-size:13px; color:var(--muted); margin:14px 0 6px; }
+  textarea, input[type=text], select {
+    width:100%; background:var(--panel2); color:var(--text);
+    border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:14px;
+  }
+  textarea { resize:vertical; min-height:64px; font-family:inherit; }
+  .file { display:flex; align-items:center; gap:10px; margin-top:8px; }
+  .file input[type=file]{ font-size:13px; color:var(--muted); }
+  .row { display:flex; gap:14px; flex-wrap:wrap; }
+  .toggles { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .toggle {
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:9px 12px; font-size:14px;
+  }
+  .switch { position:relative; width:42px; height:24px; flex:0 0 auto; }
+  .switch input { opacity:0; width:0; height:0; }
+  .slider-sw { position:absolute; inset:0; background:#39404d; border-radius:999px; transition:.15s; }
+  .slider-sw:before { content:""; position:absolute; height:18px; width:18px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.15s; }
+  .switch input:checked + .slider-sw { background:var(--accent); }
+  .switch input:checked + .slider-sw:before { transform:translateX(18px); }
+  .range { margin:6px 0 2px; }
+  .range .val { float:right; color:var(--accent); font-variant-numeric:tabular-nums; }
+  input[type=range]{ width:100%; accent-color:var(--accent); }
+  button.primary {
+    width:100%; margin-top:18px; padding:14px; font-size:15px; font-weight:800;
+    background:var(--accent); color:#1a1a1a; border:none; border-radius:12px; cursor:pointer;
+  }
+  button.primary:disabled { opacity:.5; cursor:not-allowed; }
+  .status { margin-top:14px; }
+  .bar { height:10px; background:var(--panel2); border-radius:999px; overflow:hidden; border:1px solid var(--line); }
+  .bar > div { height:100%; width:0; background:linear-gradient(90deg,var(--accent2),var(--accent)); transition:width .3s; }
+  .stage { font-size:13px; color:var(--muted); margin-top:8px; }
+  .stage.err { color:var(--err); }
+  .stage.ok { color:var(--ok); }
+  video { width:100%; border-radius:12px; margin-top:12px; background:#000; max-height:70vh; }
+  .dl { display:inline-block; margin-top:10px; color:var(--accent); text-decoration:none; font-weight:700; font-size:14px; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .chip { background:var(--panel2); border:1px solid var(--line); border-radius:999px; padding:3px 10px; font-size:12px; color:var(--muted); }
+  .hint { font-size:12px; color:var(--muted); margin-top:6px; }
+  .preview-empty { color:var(--muted); font-size:14px; text-align:center; padding:40px 10px; }
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">🐶</span>
+  <h1>SSGP Editor</h1>
+  <span class="sub">raw clip → finished vertical Reel</span>
+</header>
+
+<div class="wrap">
+<div class="grid">
+
+  <!-- LEFT: inputs + controls -->
+  <div>
+    <div class="card">
+      <h2>Source</h2>
+      <label>Video URL(s) — one per line (Google Drive links work)</label>
+      <textarea id="urls" placeholder="https://drive.google.com/uc?export=download&id=FILEID"></textarea>
+      <div class="file">
+        <input type="file" id="files" accept="video/*" multiple />
+      </div>
+      <div class="hint">Paste one or more URLs, and/or pick file(s). Multiple clips are stitched into one Reel, in order.</div>
+
+      <label>What should I do? (optional, plain English)</label>
+      <textarea id="instructions" placeholder="e.g. stitch these two, tight cuts, no music, all-caps captions, add the end card"></textarea>
+    </div>
+
+    <div class="card" style="margin-top:18px;">
+      <h2>Features</h2>
+      <div class="toggles" id="toggles">
+        <div class="toggle">Auto cuts <label class="switch"><input type="checkbox" id="t_cuts" checked><span class="slider-sw"></span></label></div>
+        <div class="toggle">Captions <label class="switch"><input type="checkbox" id="t_captions" checked><span class="slider-sw"></span></label></div>
+        <div class="toggle">Auto zoom <label class="switch"><input type="checkbox" id="t_zoom" checked><span class="slider-sw"></span></label></div>
+        <div class="toggle">Music <label class="switch"><input type="checkbox" id="t_music" checked><span class="slider-sw"></span></label></div>
+        <div class="toggle">Watermark <label class="switch"><input type="checkbox" id="t_watermark" checked><span class="slider-sw"></span></label></div>
+        <div class="toggle">CTA end card <label class="switch"><input type="checkbox" id="t_cta"><span class="slider-sw"></span></label></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px;">
+      <h2>Settings</h2>
+      <div class="range">
+        <span class="val" id="v_music">0.18</span><label style="margin:0">Music volume</label>
+        <input type="range" id="s_music" min="0" max="1" step="0.01" value="0.18">
+      </div>
+      <div class="range">
+        <span class="val" id="v_zoom">0.06</span><label style="margin:0">Zoom intensity</label>
+        <input type="range" id="s_zoom" min="0" max="0.2" step="0.005" value="0.06">
+      </div>
+      <div class="range">
+        <span class="val" id="v_sil">-30 dB</span><label style="margin:0">Silence threshold</label>
+        <input type="range" id="s_sil" min="-50" max="-10" step="1" value="-30">
+      </div>
+      <div class="row">
+        <div style="flex:1; min-width:150px;">
+          <label>Caption model</label>
+          <select id="model">
+            <option value="tiny">tiny (fastest)</option>
+            <option value="base" selected>base</option>
+            <option value="small">small</option>
+            <option value="medium">medium (accurate)</option>
+          </select>
+        </div>
+        <div style="flex:1; min-width:150px;">
+          <label>Music track</label>
+          <select id="track"><option value="">— random —</option></select>
+        </div>
+      </div>
+      <button class="primary" id="go">Render Reel</button>
+    </div>
+  </div>
+
+  <!-- RIGHT: status + preview -->
+  <div class="card" style="position:sticky; top:20px;">
+    <h2>Result</h2>
+    <div class="status">
+      <div class="bar"><div id="prog"></div></div>
+      <div class="stage" id="stage">Idle — submit a clip to start.</div>
+      <div class="chips" id="notes"></div>
+    </div>
+    <div id="preview"><div class="preview-empty">Your finished Reel will appear here.</div></div>
+  </div>
+
+</div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const bind = (slider, out, fmt) => {
+  const el = $(slider), o = $(out);
+  const upd = () => o.textContent = fmt ? fmt(el.value) : el.value;
+  el.addEventListener('input', upd); upd();
+};
+bind('s_music','v_music');
+bind('s_zoom','v_zoom');
+bind('s_sil','v_sil', v => v + ' dB');
+
+// load music tracks + config defaults
+fetch('/api/music').then(r=>r.json()).then(d=>{
+  const sel = $('track');
+  (d.tracks||[]).forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=t; sel.appendChild(o); });
+}).catch(()=>{});
+fetch('/api/config').then(r=>r.json()).then(c=>{
+  try {
+    $('s_music').value = c.music.volume; $('s_music').dispatchEvent(new Event('input'));
+    $('s_zoom').value = c.zoom.intensity; $('s_zoom').dispatchEvent(new Event('input'));
+    $('s_sil').value = c.cuts.silence_threshold_db; $('s_sil').dispatchEvent(new Event('input'));
+    $('model').value = c.captions.model || 'base';
+    $('t_cta').checked = !!c.cta.enabled;
+  } catch(e){}
+}).catch(()=>{});
+
+function collectOptions(){
+  return {
+    cuts: $('t_cuts').checked,
+    captions: { enabled: $('t_captions').checked, model: $('model').value },
+    zoom: { enabled: $('t_zoom').checked, intensity: parseFloat($('s_zoom').value) },
+    music: { enabled: $('t_music').checked, volume: parseFloat($('s_music').value), track: $('track').value || null },
+    watermark: $('t_watermark').checked,
+    cta: $('t_cta').checked,
+    min_gap: undefined,
+    silence_threshold_db: parseInt($('s_sil').value,10),
+  };
+}
+
+let poll = null;
+function setStage(msg, cls){ const s=$('stage'); s.textContent=msg; s.className='stage'+(cls?(' '+cls):''); }
+
+async function submit(){
+  const urls = $('urls').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  const files = $('files').files;
+  if(!urls.length && !files.length){ setStage('Add a URL or choose a file first.', 'err'); return; }
+
+  $('go').disabled = true;
+  $('preview').innerHTML = '<div class="preview-empty">Rendering…</div>';
+  $('notes').innerHTML = '';
+  $('prog').style.width = '0%';
+  setStage('Submitting…');
+
+  const options = collectOptions();
+  const instructions = $('instructions').value.trim();
+
+  let resp;
+  if(files.length){
+    const fd = new FormData();
+    for(const f of files) fd.append('files', f);
+    urls.forEach(u => fd.append('video_url', u));
+    fd.append('options', JSON.stringify(options));
+    if(instructions) fd.append('instructions', instructions);
+    resp = await fetch('/render', { method:'POST', body: fd });
+  } else {
+    resp = await fetch('/render', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ video_urls: urls, options, instructions })
+    });
+  }
+
+  if(!resp.ok){ setStage('Error: '+(await resp.text()), 'err'); $('go').disabled=false; return; }
+  const { id } = await resp.json();
+  setStage('Queued… (job '+id+')');
+  if(poll) clearInterval(poll);
+  poll = setInterval(()=>checkStatus(id), 1200);
+}
+
+async function checkStatus(id){
+  const r = await fetch('/render/'+id);
+  if(!r.ok) return;
+  const j = await r.json();
+  $('prog').style.width = (j.progress||0) + '%';
+  if(j.notes && j.notes.length){
+    $('notes').innerHTML = j.notes.map(n=>'<span class="chip">'+n+'</span>').join('');
+  }
+  if(j.status==='succeeded'){
+    clearInterval(poll); $('go').disabled=false;
+    setStage('Done ✓  '+(j.applied&&j.applied.output_duration?('· '+j.applied.output_duration+'s'):''), 'ok');
+    const applied = j.applied||{};
+    const chips = Object.entries(applied).filter(([k])=>['captions','music','zoom','watermark','cta','segments_kept','words'].includes(k))
+      .map(([k,v])=>'<span class="chip">'+k+': '+v+'</span>').join('');
+    $('preview').innerHTML =
+      '<video src="'+j.url+'" controls autoplay muted playsinline></video>'+
+      '<div class="chips" style="margin-top:10px">'+chips+'</div>'+
+      '<a class="dl" href="'+j.url+'" download>⬇ Download MP4</a>';
+  } else if(j.status==='failed'){
+    clearInterval(poll); $('go').disabled=false;
+    setStage('Failed: '+(j.error||'unknown error'), 'err');
+    $('preview').innerHTML = '<div class="preview-empty">Render failed.</div>';
+  } else {
+    setStage((j.stage||j.status)+'…');
+  }
+}
+
+$('go').addEventListener('click', submit);
+</script>
+</body>
+</html>

@@ -1,0 +1,134 @@
+"""Thin helpers around the system FFmpeg / FFprobe binaries."""
+
+from __future__ import annotations
+
+import json
+import shutil
+import subprocess
+from dataclasses import dataclass
+from typing import List, Optional
+
+
+class FFmpegError(RuntimeError):
+    """Raised when an ffmpeg/ffprobe command fails."""
+
+
+def install_hint() -> str:
+    """Human-readable install instructions for the current platform."""
+    import platform
+
+    system = platform.system().lower()
+    if system == "darwin":
+        return "FFmpeg not found. Install it with:  brew install ffmpeg"
+    if system == "linux":
+        return (
+            "FFmpeg not found. Install it with:\n"
+            "  Debian/Ubuntu:  sudo apt-get update && sudo apt-get install -y ffmpeg\n"
+            "  Fedora:         sudo dnf install -y ffmpeg\n"
+            "  Arch:           sudo pacman -S ffmpeg"
+        )
+    if system == "windows":
+        return "FFmpeg not found. Install it with:  winget install Gyan.FFmpeg  (or: choco install ffmpeg)"
+    return "FFmpeg not found. See https://ffmpeg.org/download.html"
+
+
+def ensure_ffmpeg() -> None:
+    """Raise a helpful error if ffmpeg/ffprobe are not on PATH."""
+    missing = [b for b in ("ffmpeg", "ffprobe") if shutil.which(b) is None]
+    if missing:
+        raise FFmpegError(install_hint())
+
+
+def ffmpeg_available() -> bool:
+    return shutil.which("ffmpeg") is not None and shutil.which("ffprobe") is not None
+
+
+@dataclass
+class ProbeInfo:
+    duration: float
+    width: int
+    height: int
+    fps: float
+    has_audio: bool
+    video_codec: str
+    audio_codec: Optional[str]
+
+
+def probe(path: str) -> ProbeInfo:
+    """Return basic media info via ffprobe."""
+    cmd = [
+        "ffprobe", "-v", "error", "-print_format", "json",
+        "-show_format", "-show_streams", path,
+    ]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise FFmpegError(f"ffprobe failed for {path}: {proc.stderr.strip()}")
+    data = json.loads(proc.stdout)
+
+    v = next((s for s in data.get("streams", []) if s.get("codec_type") == "video"), None)
+    a = next((s for s in data.get("streams", []) if s.get("codec_type") == "audio"), None)
+    if v is None:
+        raise FFmpegError(f"No video stream found in {path}")
+
+    # frame rate can be "30000/1001"
+    fps = 30.0
+    rate = v.get("avg_frame_rate") or v.get("r_frame_rate") or "30/1"
+    try:
+        num, den = rate.split("/")
+        fps = float(num) / float(den) if float(den) else float(num)
+    except Exception:
+        pass
+
+    duration = 0.0
+    for src in (v.get("duration"), data.get("format", {}).get("duration")):
+        try:
+            duration = float(src)
+            if duration > 0:
+                break
+        except (TypeError, ValueError):
+            continue
+
+    return ProbeInfo(
+        duration=duration,
+        width=int(v.get("width", 0)),
+        height=int(v.get("height", 0)),
+        fps=fps or 30.0,
+        has_audio=a is not None,
+        video_codec=v.get("codec_name", ""),
+        audio_codec=(a or {}).get("codec_name"),
+    )
+
+
+def run(cmd: List[str], log_path: Optional[str] = None) -> str:
+    """Run an ffmpeg command, raising FFmpegError with stderr tail on failure.
+
+    Returns the combined stderr (ffmpeg logs progress there). If ``log_path``
+    is given, the full stderr is appended to that file for debugging.
+    """
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if log_path:
+        try:
+            with open(log_path, "a", encoding="utf-8") as fh:
+                fh.write(" ".join(cmd) + "\n")
+                fh.write(proc.stderr + "\n\n")
+        except OSError:
+            pass
+    if proc.returncode != 0:
+        tail = "\n".join(proc.stderr.strip().splitlines()[-25:])
+        raise FFmpegError(f"ffmpeg failed (exit {proc.returncode}):\n{tail}")
+    return proc.stderr
+
+
+def hex_to_ass(color: str, alpha: float = 1.0) -> str:
+    """Convert '#rrggbb' to an ASS colour '&HAABBGGRR' (note: BGR order)."""
+    color = color.lstrip("#")
+    if len(color) == 3:
+        color = "".join(c * 2 for c in color)
+    r, g, b = color[0:2], color[2:4], color[4:6]
+    a = format(int(round((1.0 - alpha) * 255)), "02X")  # ASS alpha: 00=opaque, FF=transparent
+    return f"&H{a}{b}{g}{r}".upper()
+
+
+def hex_to_ffmpeg(color: str) -> str:
+    """Convert '#rrggbb' to ffmpeg drawtext colour '0xRRGGBB'."""
+    return "0x" + color.lstrip("#")

@@ -1,0 +1,20 @@
+# SSGP Editor
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# runtime artifacts (keep the folders, ignore contents)
+work/*
+!work/.gitkeep
+output/*
+!output/.gitkeep
+
+# user-supplied media
+music/*
+!music/README.txt
+
+# local test samples — keep only the self-test script
+samples/*
+!samples/e2e_test.py
