@@ -118,8 +118,26 @@ def render_video(
     if words:
         applied["transcript"] = " ".join(w.text for w in words)
 
-    # ---- 4) plan cuts ------------------------------------------------------
-    progress(38, "plan-cuts")
+    # ---- 4) captions overlay track (ORIGINAL timeline) ---------------------
+    # Captions are burned onto the FULL clip BEFORE any cutting, so they become
+    # part of the frames and get cut in lockstep with the video — they can
+    # never drift out of sync no matter how many cuts happen.
+    caption_list = None
+    if words:
+        progress(30, "captions")
+        caption_list = textrender.build_caption_track(words, cfg["captions"], fonts_dir, W, H, work)
+
+    # ---- 5) style the FULL clip: reframe + zoom + captions + watermark -----
+    progress(48, "video")
+    styled_full = str(work / "styled_full.mp4")
+    _video_pass(source_path, styled_full, cfg, W, H, FPS, src_duration,
+                [(0.0, src_duration)], caption_list, fonts_dir, work, log_path)
+    applied["zoom"] = bool(cfg["zoom"].get("enabled"))
+    applied["watermark"] = bool(cfg["watermark"].get("enabled"))
+    applied["captions"] = caption_list is not None
+
+    # ---- 6) plan cuts (silence + optional AI smart-cut) -------------------
+    progress(70, "plan-cuts")
     keeps: List[Segment] = [(0.0, src_duration)]
     if want_cuts:
         c = cfg["cuts"]
@@ -129,19 +147,16 @@ def render_video(
             min_gap=float(c.get("min_gap", 0.6)),
         )
         keeps = silence_mod.compute_keep_segments(
-            src_duration,
-            silences,
+            src_duration, silences,
             keep_pad=float(c.get("keep_pad", 0.15)),
             min_segment=float(c.get("min_segment", 0.2)),
             max_removed_per_gap=c.get("max_removed_per_gap"),
         )
-        # never clip a word: extend any boundary that lands inside speech
         keeps = silence_mod.snap_segments_to_words(keeps, words)
         applied["silences_found"] = len(silences)
 
-        # AI smart-cut: remove spoken mistakes / flubs the silence pass can't catch
         if c.get("smart_cut"):
-            progress(42, "smart-cut")
+            progress(74, "smart-cut")
             sc = smartcut.plan_removals(words, c)
             removals = sc.get("removals", [])
             if removals:
@@ -156,37 +171,23 @@ def render_video(
 
     cut_duration = silence_mod.total_kept_duration(keeps)
     applied["output_duration"] = round(cut_duration, 2)
-
-    # remap caption words onto the cut timeline
-    if words:
-        words = silence_mod.remap_words(words, keeps)
-
     single_segment = len(keeps) == 1 and abs(keeps[0][0]) < 1e-3 and abs(keeps[0][1] - src_duration) < 0.05
 
-    # ---- 5) cut pass -------------------------------------------------------
+    # ---- 7) cut the captioned video + source audio together (lockstep) ----
+    cut_path = str(work / "cut.mp4")
     if single_segment:
-        cut_path = source_path
+        if info.has_audio:
+            run(["ffmpeg", "-y", "-i", styled_full, "-i", source_path,
+                 "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "aac",
+                 "-b:a", cfg["output"].get("audio_bitrate", "192k"), "-shortest", cut_path], log_path)
+        else:
+            cut_path = styled_full
     else:
-        progress(46, "cut")
-        cut_path = str(work / "cut.mp4")
-        _apply_cuts(source_path, cut_path, keeps, info.has_audio, FPS, log_path)
-
-    # ---- 6) captions overlay track (rendered by Pillow, not libass) --------
-    caption_list = None
-    if words:
-        progress(56, "captions")
-        caption_list = textrender.build_caption_track(words, cfg["captions"], fonts_dir, W, H, work)
-
-    # ---- 7) video pass (reframe + zoom + captions + watermark) -------------
-    progress(60, "video")
-    video_only = str(work / "video.mp4")
-    _video_pass(cut_path, video_only, cfg, W, H, FPS, cut_duration, keeps, caption_list, fonts_dir, work, log_path)
-    applied["zoom"] = bool(cfg["zoom"].get("enabled"))
-    applied["watermark"] = bool(cfg["watermark"].get("enabled"))
-    applied["captions"] = caption_list is not None
+        progress(80, "cut")
+        _apply_cuts_av(styled_full, source_path, cut_path, keeps, info.has_audio, FPS, cfg, log_path)
 
     # ---- 8) audio pass (voice + ducked music) ------------------------------
-    progress(86, "audio")
+    progress(88, "audio")
     audio_path = str(work / "audio.m4a")
     music_used = _audio_pass(cut_path, audio_path, cfg, cut_duration, info.has_audio, work, job_id, log_path)
     applied["music"] = music_used
@@ -195,7 +196,7 @@ def render_video(
     progress(94, "mux")
     main_mp4 = str(work / "main.mp4")
     run([
-        "ffmpeg", "-y", "-i", video_only, "-i", audio_path,
+        "ffmpeg", "-y", "-i", cut_path, "-i", audio_path,
         "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "copy",
         "-shortest", main_mp4,
     ], log_path)
@@ -220,31 +221,39 @@ def render_video(
 # ---------------------------------------------------------------------------
 
 
-def _apply_cuts(src: str, dst: str, keeps: Sequence[Segment], has_audio: bool, fps: int, log_path):
-    """Trim + concat the kept segments into a single tight clip."""
-    v_chains, a_chains = [], []
-    v_labels, a_labels = [], []
+def _apply_cuts_av(video_src: str, audio_src: str, dst: str, keeps: Sequence[Segment],
+                   has_audio: bool, fps: int, cfg: dict, log_path):
+    """Trim + concat the kept segments, taking VIDEO from ``video_src`` (the
+    already-captioned styled clip) and AUDIO from ``audio_src`` (the original),
+    using the SAME cut points. Because the captions are already baked into the
+    video frames, they are cut in perfect lockstep and cannot drift.
+    """
+    o = cfg["output"]
+    v_chains, v_labels = [], []
+    a_chains, a_labels = [], []
     for i, (a, b) in enumerate(keeps):
         v_chains.append(f"[0:v]trim=start={a:.3f}:end={b:.3f},setpts=PTS-STARTPTS[v{i}]")
         v_labels.append(f"[v{i}]")
         if has_audio:
-            a_chains.append(f"[0:a]atrim=start={a:.3f}:end={b:.3f},asetpts=PTS-STARTPTS[a{i}]")
+            a_chains.append(f"[1:a]atrim=start={a:.3f}:end={b:.3f},asetpts=PTS-STARTPTS[a{i}]")
             a_labels.append(f"[a{i}]")
     n = len(keeps)
-    fc = ";".join(v_chains)
-    fc += f";{''.join(v_labels)}concat=n={n}:v=1:a=0[v]"
+    fc = ";".join(v_chains) + f";{''.join(v_labels)}concat=n={n}:v=1:a=0[v]"
     maps = ["-map", "[v]"]
+    inputs = ["-i", video_src]
     if has_audio:
-        fc += ";" + ";".join(a_chains)
-        fc += f";{''.join(a_labels)}concat=n={n}:v=0:a=1[a]"
+        inputs += ["-i", audio_src]
+        fc += ";" + ";".join(a_chains) + f";{''.join(a_labels)}concat=n={n}:v=0:a=1[a]"
         maps += ["-map", "[a]"]
 
     cmd = [
-        "ffmpeg", "-y", "-i", src, "-filter_complex", fc, *maps,
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18", "-pix_fmt", "yuv420p",
+        "ffmpeg", "-y", *inputs, "-filter_complex", fc, *maps,
+        "-c:v", o.get("video_codec", "libx264"), "-crf", str(o.get("crf", 20)),
+        "-preset", o.get("preset", "medium"), "-pix_fmt", o.get("pixel_format", "yuv420p"),
+        "-r", str(fps),
     ]
     if has_audio:
-        cmd += ["-c:a", "aac", "-b:a", "192k"]
+        cmd += ["-c:a", "aac", "-b:a", o.get("audio_bitrate", "192k")]
     cmd += [dst]
     run(cmd, log_path)
 

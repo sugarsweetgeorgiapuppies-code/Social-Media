@@ -151,10 +151,11 @@ def build_caption_track(
     with open(list_path, "w", encoding="utf-8") as fh:
         fh.write("ffconcat version 1.0\n")
         for path, dur in states:
-            fh.write(f"file '{path}'\n")
+            # absolute path — concat resolves relative entries against the list's
+            # own directory, which would double the path
+            fh.write(f"file '{Path(path).resolve()}'\n")
             fh.write(f"duration {dur:.3f}\n")
-        # concat demuxer needs the last file repeated to flush the final segment
-        fh.write(f"file '{states[-1][0]}'\n")
+        fh.write(f"file '{Path(states[-1][0]).resolve()}'\n")
     return str(list_path)
 
 
