@@ -50,7 +50,7 @@ captions:
   enabled: true
 
   # --- transcription (faster-whisper) ---
-  model: base                 # tiny | base | small | medium | large-v3  (bigger = more accurate + slower)
+  model: small                # tiny | base | small | medium | large-v3  (bigger = more accurate words + timing, a bit slower)
   language: null              # e.g. "en" to force English; null = auto-detect
   compute_type: int8          # int8 (fast, CPU) | int8_float16 | float16 (GPU) | float32
   device: auto                # auto | cpu | cuda

@@ -115,6 +115,9 @@ def render_video(
                 applied["captions_error"] = str(exc)
                 words = []
 
+    if words:
+        applied["transcript"] = " ".join(w.text for w in words)
+
     # ---- 4) plan cuts ------------------------------------------------------
     progress(38, "plan-cuts")
     keeps: List[Segment] = [(0.0, src_duration)]
@@ -137,14 +140,18 @@ def render_video(
         applied["silences_found"] = len(silences)
 
         # AI smart-cut: remove spoken mistakes / flubs the silence pass can't catch
-        if c.get("smart_cut") and words:
+        if c.get("smart_cut"):
             progress(42, "smart-cut")
-            removals = smartcut.plan_removals(words, c)
+            sc = smartcut.plan_removals(words, c)
+            removals = sc.get("removals", [])
             if removals:
                 keeps = silence_mod.subtract_ranges(keeps, removals, float(c.get("min_segment", 0.2)))
-                applied["smart_cut_removed"] = [[round(s, 2), round(e, 2)] for s, e in removals]
-            else:
-                applied["smart_cut_removed"] = []
+            applied["smart_cut"] = {
+                "status": sc.get("status"),
+                "detail": sc.get("detail"),
+                "removed": [[round(s, 2), round(e, 2)] for s, e in removals],
+                "reasons": sc.get("reasons", []),
+            }
         applied["segments_kept"] = len(keeps)
 
     cut_duration = silence_mod.total_kept_duration(keeps)

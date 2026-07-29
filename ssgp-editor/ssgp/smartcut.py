@@ -43,21 +43,29 @@ def _transcript_lines(words: Sequence[Word]) -> str:
     return "\n".join(lines)
 
 
-def plan_removals(words: Sequence[Word], cfg_cuts: dict) -> List[Range]:
-    """Return [(start, end), ...] ranges (original timeline) to remove, or []."""
+def plan_removals(words: Sequence[Word], cfg_cuts: dict) -> dict:
+    """Ask Claude which ranges to cut.
+
+    Returns a dict so the caller can SHOW what happened (no more silent
+    no-ops):
+      {"removals": [(s,e),...], "status": "ok"|"skipped"|"error",
+       "reasons": [...], "detail": str}
+    """
     if not words:
-        return []
+        return {"removals": [], "status": "skipped", "detail": "no transcript", "reasons": []}
     key = _api_key(cfg_cuts)
     if not key:
-        return []
+        return {"removals": [], "status": "skipped",
+                "detail": "no Anthropic API key (set ANTHROPIC_API_KEY)", "reasons": []}
 
     try:
         import anthropic
     except Exception:
-        return []
+        return {"removals": [], "status": "error",
+                "detail": "anthropic package not installed", "reasons": []}
 
     instructions = cfg_cuts.get("smart_cut_instructions") or _DEFAULT_INSTRUCTIONS
-    model = cfg_cuts.get("smart_cut_model", "claude-sonnet-5")
+    model = cfg_cuts.get("smart_cut_model") or "claude-sonnet-5"
     transcript = _transcript_lines(words)
 
     system = (
@@ -72,27 +80,27 @@ def plan_removals(words: Sequence[Word], cfg_cuts: dict) -> List[Range]:
     try:
         client = anthropic.Anthropic(api_key=key)
         msg = client.messages.create(
-            model=model,
-            max_tokens=1500,
-            system=system,
+            model=model, max_tokens=1500, system=system,
             messages=[{"role": "user", "content": transcript}],
         )
         raw = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
         m = re.search(r"\[.*\]", raw, re.S)
         data = json.loads(m.group(0)) if m else []
-    except Exception:
-        return []
+    except Exception as exc:
+        return {"removals": [], "status": "error", "detail": f"{type(exc).__name__}: {exc}", "reasons": []}
 
     ranges: List[Range] = []
+    reasons: List[str] = []
     for item in data:
         try:
-            s = float(item["start"])
-            e = float(item["end"])
+            s, e = float(item["start"]), float(item["end"])
         except (KeyError, TypeError, ValueError):
             continue
         if e > s:
             ranges.append((s, e))
-    return _merge(ranges)
+            reasons.append(str(item.get("reason", "")))
+    return {"removals": _merge(ranges), "status": "ok", "reasons": reasons,
+            "detail": f"cut {len(ranges)} range(s) via {model}"}
 
 
 def _merge(ranges: List[Range]) -> List[Range]:

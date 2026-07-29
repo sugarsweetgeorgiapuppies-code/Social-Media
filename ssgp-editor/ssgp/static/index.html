@@ -293,9 +293,20 @@ async function checkStatus(id){
     const applied = j.applied||{};
     const chips = Object.entries(applied).filter(([k])=>['captions','music','zoom','watermark','cta','segments_kept','words'].includes(k))
       .map(([k,v])=>'<span class="chip">'+k+': '+v+'</span>').join('');
+    // smart-cut report
+    let sc = '';
+    if(applied.smart_cut){
+      const s = applied.smart_cut;
+      const cls = s.status==='ok' ? 'ok' : (s.status==='error' ? 'err' : '');
+      sc = '<div class="stage '+cls+'" style="margin-top:10px">✂️ Smart cut: '+(s.detail||s.status)+'</div>';
+      if(s.reasons && s.reasons.length) sc += '<div class="chips">'+s.reasons.map(r=>'<span class="chip">cut: '+r+'</span>').join('')+'</div>';
+    }
+    // transcript (so you can see what it heard)
+    let tr = '';
+    if(applied.transcript) tr = '<details style="margin-top:10px"><summary class="hint">What it heard (transcript)</summary><div class="hint" style="margin-top:6px">'+applied.transcript+'</div></details>';
     $('preview').innerHTML =
       '<video src="'+j.url+'" controls autoplay muted playsinline></video>'+
-      '<div class="chips" style="margin-top:10px">'+chips+'</div>'+
+      '<div class="chips" style="margin-top:10px">'+chips+'</div>'+ sc + tr +
       '<a class="dl" href="'+j.url+'" download>⬇ Download MP4</a>';
   } else if(j.status==='failed'){
     clearInterval(poll); $('go').disabled=false;
