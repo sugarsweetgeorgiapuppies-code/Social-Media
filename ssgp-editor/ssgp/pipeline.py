@@ -241,12 +241,17 @@ def _zoompan_expr(cfg: dict, duration: float, fps: int, keeps: Sequence[Segment]
     if z.get("punch_on_cuts") and len(keeps) > 1:
         amt = float(z.get("punch_amount", 0.045))
         decay = max(0.05, float(z.get("punch_decay", 0.45)))
-        # cut times on the output timeline = cumulative start of each keep>0
+        min_gap = float(z.get("punch_min_gap", 0.8))
+        # cut times on the output timeline = cumulative start of each keep>0,
+        # but only where a meaningful chunk was removed (skip tiny pauses so the
+        # zoom doesn't jitter on every breath).
         acc = 0.0
         cut_times: List[float] = []
         for i, (a, b) in enumerate(keeps):
             if i > 0:
-                cut_times.append(acc)
+                removed = a - keeps[i - 1][1]  # seconds removed at this boundary
+                if removed >= min_gap:
+                    cut_times.append(acc)
             acc += (b - a)
         for c in cut_times:
             expr += (

@@ -75,10 +75,11 @@ captions:
 # ---------------------------------------------------------------------------
 zoom:
   enabled: true
-  intensity: 0.06     # total Ken Burns push over the clip (0.06 = zoom to +6%). Try 0.03 (barely) .. 0.12 (strong).
-  punch_on_cuts: true # add a quick zoom bump at each cut
-  punch_amount: 0.045 # how hard the punch hits (added zoom)
+  intensity: 0.05     # total Ken Burns push over the clip (0.05 = zoom to +5%). Try 0.03 (barely) .. 0.12 (strong).
+  punch_on_cuts: false # quick zoom bump at each cut. OFF by default — on a talking-head it reads as jittery/"warping". Turn on for fast montage-style edits.
+  punch_amount: 0.04  # how hard the punch hits (added zoom) when punch_on_cuts is true
   punch_decay: 0.45   # seconds for a punch to ease back out
+  punch_min_gap: 0.8  # only punch at cuts where at least this many seconds were removed (avoids punching every tiny pause)
 
 # ---------------------------------------------------------------------------
 # 4) BACKGROUND MUSIC — mix a bed from the /music folder, ducked under Phil's

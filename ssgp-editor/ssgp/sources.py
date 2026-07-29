@@ -75,46 +75,83 @@ def download_source(url: str, dest: str, timeout: int = 120) -> str:
     return str(dest_p)
 
 
-def _normalise_clip(src: str, dst_ts: str, w: int, h: int, fps: int, log_path=None) -> None:
-    """Reframe one clip to the vertical canvas and write an MPEG-TS segment.
-
-    TS segments with identical codec parameters concatenate losslessly with a
-    stream copy, which is fast and robust across mixed-resolution inputs.
-    """
+def _normalise_clip(src: str, dst: str, w: int, h: int, fps: int, log_path=None) -> None:
+    """Reframe one clip to the vertical canvas so all clips share codec params."""
     info = probe(src)
     vf = (
         f"scale={w}:{h}:force_original_aspect_ratio=increase,"
-        f"crop={w}:{h},fps={fps},setsar=1"
+        f"crop={w}:{h},fps={fps},setsar=1,format=yuv420p"
     )
     cmd = ["ffmpeg", "-y", "-i", src]
     if not info.has_audio:
-        # synthesise silent audio so every segment has a matching audio stream
+        # synthesise silent audio so every clip has a matching audio stream
         cmd += ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100", "-shortest"]
     cmd += [
         "-vf", vf,
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "192k",
-        "-f", "mpegts", dst_ts,
+        dst,
     ]
     run(cmd, log_path)
 
 
-def stitch_clips(paths: List[str], dest: str, w: int, h: int, fps: int, work_dir: str, log_path=None) -> str:
-    """Stitch multiple clips into one vertical source at ``dest`` (mp4)."""
+def stitch_clips(
+    paths: List[str], dest: str, w: int, h: int, fps: int, work_dir: str,
+    log_path=None, xfade: float = 0.35,
+) -> str:
+    """Stitch multiple clips into one vertical source, blended with a short
+    crossfade (video xfade + audio acrossfade) so joins look smooth instead of
+    hard-cut. Set ``xfade`` to 0 for a straight cut.
+    """
     if len(paths) == 1:
         return paths[0]
 
     work = Path(work_dir)
     work.mkdir(parents=True, exist_ok=True)
-    ts_parts: List[str] = []
-    for i, p in enumerate(paths):
-        ts = str(work / f"part{i:03d}.ts")
-        _normalise_clip(p, ts, w, h, fps, log_path)
-        ts_parts.append(ts)
 
-    concat = "concat:" + "|".join(ts_parts)
+    norm: List[str] = []
+    durs: List[float] = []
+    for i, p in enumerate(paths):
+        out = str(work / f"part{i:03d}.mp4")
+        _normalise_clip(p, out, w, h, fps, log_path)
+        norm.append(out)
+        durs.append(probe(out).duration)
+
+    # a straight concat (no blend) — robust fallback
+    if xfade <= 0:
+        list_file = work / "concat.txt"
+        list_file.write_text("".join(f"file '{p}'\n" for p in norm), encoding="utf-8")
+        run([
+            "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_file),
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-movflags", "+faststart", dest,
+        ], log_path)
+        return dest
+
+    # crossfade chain. Clamp the transition so it fits the shortest clip.
+    t = min(xfade, min(durs) * 0.4)
+    inputs: List[str] = []
+    for p in norm:
+        inputs += ["-i", p]
+
+    v_prev, a_prev = "[0:v]", "[0:a]"
+    fc_parts: List[str] = []
+    acc = durs[0]
+    for i in range(1, len(norm)):
+        vlbl, albl = f"[vx{i}]", f"[ax{i}]"
+        offset = max(0.0, acc - t)
+        fc_parts.append(
+            f"{v_prev}[{i}:v]xfade=transition=fade:duration={t:.3f}:offset={offset:.3f}{vlbl}"
+        )
+        fc_parts.append(f"{a_prev}[{i}:a]acrossfade=d={t:.3f}{albl}")
+        v_prev, a_prev = vlbl, albl
+        acc = acc + durs[i] - t
+
+    fc = ";".join(fc_parts)
     run([
-        "ffmpeg", "-y", "-i", concat,
-        "-c", "copy", "-bsf:a", "aac_adtstoasc", "-movflags", "+faststart", dest,
+        "ffmpeg", "-y", *inputs, "-filter_complex", fc,
+        "-map", v_prev, "-map", a_prev,
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-movflags", "+faststart", dest,
     ], log_path)
     return dest
