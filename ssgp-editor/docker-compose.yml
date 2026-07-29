@@ -1,0 +1,21 @@
+# Run SSGP Editor anywhere with one command:  docker compose up -d
+# It stays up and restarts itself (server reboots, crashes) — "always on".
+services:
+  ssgp-editor:
+    build: .
+    image: ssgp-editor
+    ports:
+      - "8080:8080"                 # open http://<this-machine>:8080
+    volumes:
+      - ./music:/app/music          # your music beds
+      - ./output:/app/output        # finished renders
+      - ./config.yaml:/app/config.yaml   # tweak settings without rebuilding
+      - hf-cache:/root/.cache/huggingface  # keep the caption model between restarts
+    environment:
+      # optional: enables AI Smart cut. Put ANTHROPIC_API_KEY in a .env file
+      # next to this compose file, or export it before `docker compose up`.
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    restart: unless-stopped
+
+volumes:
+  hf-cache:

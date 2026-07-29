@@ -1,0 +1,13 @@
+.git
+.venv
+venv
+__pycache__
+*.pyc
+work/*
+!work/.gitkeep
+output/*
+!output/.gitkeep
+samples
+*.mp4
+*.mov
+.DS_Store
