@@ -34,6 +34,14 @@ cuts:
   min_segment: 0.20           # seconds — drop tiny leftover slivers shorter than this
   max_removed_per_gap: null   # optional cap (seconds) on how much a single gap may be shortened; null = no cap
 
+  # --- AI smart-cut: removes SPOKEN mistakes (false starts, "I forgot the
+  #     script", retakes, off-topic tangents) that silence-cutting can't catch.
+  #     Needs an Anthropic API key. Off by default. ---
+  smart_cut: false
+  anthropic_api_key: null     # or set the ANTHROPIC_API_KEY environment variable instead
+  smart_cut_model: claude-sonnet-5
+  smart_cut_instructions: null  # null = sensible default; or describe what to cut in plain English
+
 # ---------------------------------------------------------------------------
 # 2) AUTO CAPTIONS — transcribe locally with faster-whisper, then burn in
 #    animated word-by-word captions. No API key, runs on your machine.
@@ -64,9 +72,10 @@ captions:
   # layout
   position_pct: 0.74          # vertical position of the caption baseline (0=top, 1=bottom). 0.74 = lower third.
   width_pct: 0.84             # captions use ~84% of frame width
-  max_chars_per_line: 22      # wrap a caption line at ~22 characters
+  max_chars_per_line: 20      # wrap a caption line at ~20 characters (fewer words on screen = tighter sync feel)
   uppercase: false            # set true for ALL-CAPS captions
-  line_pause: 0.7             # seconds of silence that forces a new caption line
+  line_pause: 0.5             # seconds of silence that forces a new caption line
+  time_offset: 0.0            # nudge all captions earlier(-) or later(+) in seconds, if they feel a touch ahead/behind
 
 # ---------------------------------------------------------------------------
 # 3) AUTO ZOOM / PUNCH-IN — subtle motion so the clip never feels static.

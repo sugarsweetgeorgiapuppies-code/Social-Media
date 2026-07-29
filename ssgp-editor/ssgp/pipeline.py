@@ -22,6 +22,7 @@ from typing import Callable, List, Optional, Sequence, Tuple
 
 from . import music as music_mod
 from . import silence as silence_mod
+from . import smartcut
 from . import textrender
 from .config import resolve_path
 from .ffmpeg_utils import (
@@ -134,6 +135,16 @@ def render_video(
         # never clip a word: extend any boundary that lands inside speech
         keeps = silence_mod.snap_segments_to_words(keeps, words)
         applied["silences_found"] = len(silences)
+
+        # AI smart-cut: remove spoken mistakes / flubs the silence pass can't catch
+        if c.get("smart_cut") and words:
+            progress(42, "smart-cut")
+            removals = smartcut.plan_removals(words, c)
+            if removals:
+                keeps = silence_mod.subtract_ranges(keeps, removals, float(c.get("min_segment", 0.2)))
+                applied["smart_cut_removed"] = [[round(s, 2), round(e, 2)] for s, e in removals]
+            else:
+                applied["smart_cut_removed"] = []
         applied["segments_kept"] = len(keeps)
 
     cut_duration = silence_mod.total_kept_duration(keeps)

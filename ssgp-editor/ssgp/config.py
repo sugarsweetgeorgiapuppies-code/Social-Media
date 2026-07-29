@@ -60,6 +60,7 @@ def merge_options(cfg: Dict[str, Any], options: Dict[str, Any] | None) -> Dict[s
 # the full nested structure.
 _FLAT_MAP = {
     "cuts": ("cuts", "enabled"),
+    "smart_cut": ("cuts", "smart_cut"),
     "captions": ("captions", "enabled"),
     "zoom": ("zoom", "enabled"),
     "music": ("music", "enabled"),

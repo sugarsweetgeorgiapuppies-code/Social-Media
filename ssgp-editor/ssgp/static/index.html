@@ -107,7 +107,10 @@
         <div class="toggle">Music <label class="switch"><input type="checkbox" id="t_music" checked><span class="slider-sw"></span></label></div>
         <div class="toggle">Watermark <label class="switch"><input type="checkbox" id="t_watermark" checked><span class="slider-sw"></span></label></div>
         <div class="toggle">CTA end card <label class="switch"><input type="checkbox" id="t_cta"><span class="slider-sw"></span></label></div>
+        <div class="toggle" title="Uses AI to cut spoken mistakes, false starts, and off-topic bits (needs an Anthropic API key)">Smart cut ✨ <label class="switch"><input type="checkbox" id="t_smart"><span class="slider-sw"></span></label></div>
+        <div class="toggle" title="Make one finished Reel per clip instead of stitching them into one">Separate Reels <label class="switch"><input type="checkbox" id="t_separate"><span class="slider-sw"></span></label></div>
       </div>
+      <div class="hint">Turn on <b>Separate Reels</b> to upload many clips and get one finished Reel back per clip. Leave it off to stitch clips into a single Reel.</div>
     </div>
 
     <div class="card" style="margin-top:18px;">
@@ -180,18 +183,19 @@ fetch('/api/config').then(r=>r.json()).then(c=>{
     $('s_sil').value = c.cuts.silence_threshold_db; $('s_sil').dispatchEvent(new Event('input'));
     $('model').value = c.captions.model || 'base';
     $('t_cta').checked = !!c.cta.enabled;
+    $('t_smart').checked = !!(c.cuts && c.cuts.smart_cut);
   } catch(e){}
 }).catch(()=>{});
 
 function collectOptions(){
   return {
     cuts: $('t_cuts').checked,
+    smart_cut: $('t_smart').checked,
     captions: { enabled: $('t_captions').checked, model: $('model').value },
     zoom: { enabled: $('t_zoom').checked, intensity: parseFloat($('s_zoom').value) },
     music: { enabled: $('t_music').checked, volume: parseFloat($('s_music').value), track: $('track').value || null },
     watermark: $('t_watermark').checked,
     cta: $('t_cta').checked,
-    min_gap: undefined,
     silence_threshold_db: parseInt($('s_sil').value,10),
   };
 }
@@ -212,6 +216,7 @@ async function submit(){
 
   const options = collectOptions();
   const instructions = $('instructions').value.trim();
+  const separate = $('t_separate').checked;
 
   let resp;
   if(files.length){
@@ -219,20 +224,59 @@ async function submit(){
     for(const f of files) fd.append('files', f);
     urls.forEach(u => fd.append('video_url', u));
     fd.append('options', JSON.stringify(options));
+    if(separate) fd.append('separate', 'true');
     if(instructions) fd.append('instructions', instructions);
     resp = await fetch('/render', { method:'POST', body: fd });
   } else {
     resp = await fetch('/render', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ video_urls: urls, options, instructions })
+      body: JSON.stringify({ video_urls: urls, options, instructions, separate })
     });
   }
 
   if(!resp.ok){ setStage('Error: '+(await resp.text()), 'err'); $('go').disabled=false; return; }
-  const { id } = await resp.json();
-  setStage('Queued… (job '+id+')');
+  const data = await resp.json();
   if(poll) clearInterval(poll);
-  poll = setInterval(()=>checkStatus(id), 1200);
+  if(data.ids){                       // batch mode — many Reels
+    setStage('Queued '+data.ids.length+' Reels…');
+    buildGallery(data.ids);
+    poll = setInterval(()=>checkBatch(data.ids), 1500);
+  } else {
+    setStage('Queued… (job '+data.id+')');
+    poll = setInterval(()=>checkStatus(data.id), 1200);
+  }
+}
+
+function buildGallery(ids){
+  $('preview').innerHTML = '<div id="gallery" style="display:grid;grid-template-columns:1fr 1fr;gap:10px"></div>';
+  const g = $('gallery');
+  ids.forEach((id,i)=>{
+    const cell = document.createElement('div');
+    cell.id = 'cell_'+id;
+    cell.innerHTML = '<div class="bar"><div class="pg" style="height:100%;width:0;background:linear-gradient(90deg,var(--accent2),var(--accent))"></div></div><div class="stage" style="font-size:12px">Reel '+(i+1)+'…</div>';
+    g.appendChild(cell);
+  });
+}
+
+async function checkBatch(ids){
+  let done = 0;
+  for(let i=0;i<ids.length;i++){
+    const id = ids[i];
+    const r = await fetch('/render/'+id); if(!r.ok) continue;
+    const j = await r.json();
+    const cell = $('cell_'+id); if(!cell) continue;
+    const bar = cell.querySelector('.pg'), st = cell.querySelector('.stage');
+    if(bar) bar.style.width = (j.progress||0)+'%';
+    if(j.status==='succeeded'){
+      done++;
+      cell.innerHTML = '<video src="'+j.url+'" controls muted playsinline style="margin:0"></video>'+
+        '<a class="dl" href="'+j.url+'" download>⬇ Reel '+(i+1)+'</a>';
+    } else if(j.status==='failed'){
+      done++;
+      if(st){ st.textContent='Reel '+(i+1)+' failed'; st.className='stage err'; }
+    } else if(st){ st.textContent = 'Reel '+(i+1)+': '+(j.stage||j.status); }
+  }
+  if(done>=ids.length){ clearInterval(poll); $('go').disabled=false; setStage('Done ✓ '+ids.length+' Reels', 'ok'); }
 }
 
 async function checkStatus(id){

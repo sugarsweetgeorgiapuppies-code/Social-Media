@@ -10,3 +10,4 @@ pyyaml>=6.0.1             # config.yaml
 requests>=2.31.0          # fetch source video from a URL (incl. Google Drive)
 faster-whisper>=1.0.3     # local speech-to-text with word timestamps
 pillow>=10.0.0            # render captions/watermark/CTA as overlays (no libass needed)
+anthropic>=0.40.0        # optional: AI "smart cut" (only used if you enable it + set a key)

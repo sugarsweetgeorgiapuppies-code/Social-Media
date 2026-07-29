@@ -76,9 +76,11 @@ async def render(request: Request):
     options: Dict[str, Any] = {}
     instructions: str = ""
     local_inputs: List[str] = []
+    separate = False
 
     if ctype.startswith("multipart/form-data"):
         form = await request.form()
+        separate = str(form.get("separate", "")).lower() in ("1", "true", "yes", "on")
         # options / instructions may come as JSON strings or plain fields
         if form.get("options"):
             try:
@@ -108,12 +110,27 @@ async def render(request: Request):
         sources = _sources_from_payload(payload)
         options = payload.get("options") or {}
         instructions = str(payload.get("instructions") or payload.get("prompt") or "")
+        separate = bool(payload.get("separate"))
 
     if not sources and not local_inputs:
         raise HTTPException(status_code=400, detail="Provide video_url, video_urls, or an uploaded file")
 
-    job = STORE.create(sources=sources, options=options, instructions=instructions)
-    WORKER.submit(job, local_inputs=local_inputs)
+    # pair each source with its uploaded file (if any), preserving order
+    upload_iter = iter(local_inputs)
+    items = [(s, next(upload_iter) if s.startswith("upload:") else None) for s in sources]
+
+    # Batch mode: one finished Reel per clip (10 in -> 10 out).
+    if separate and len(items) > 1:
+        ids = []
+        for src, path in items:
+            job = STORE.create(sources=[src], options=options, instructions=instructions)
+            WORKER.submit(job, local_inputs=[path] if path else None)
+            ids.append(job.id)
+        return JSONResponse({"ids": ids, "count": len(ids), "status": "queued"})
+
+    # Default: a single Reel (multiple clips are stitched together).
+    job = STORE.create(sources=[s for s, _ in items], options=options, instructions=instructions)
+    WORKER.submit(job, local_inputs=[p for _, p in items if p])
     return JSONResponse({"id": job.id, "status": "queued"})
 
 

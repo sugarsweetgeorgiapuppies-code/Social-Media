@@ -133,7 +133,15 @@ Notes:
   `uc?export=download&id=...` links (the large-file “confirm” page is handled
   for you). `/file/d/<id>/view` links work too.
 - To **stitch multiple clips**, send `"video_urls": ["url1","url2",...]` (they're
-  joined in order into one Reel).
+  joined in order into one Reel, with smooth crossfades).
+- To make **one Reel per clip** (batch: 10 in → 10 out), add `"separate": true`.
+  The response is `{ "ids": ["id1","id2",...], "count": N, "status": "queued" }`
+  — poll each id with `GET /render/{id}` exactly as usual.
+- **Smart cut (AI)**: add `"smart_cut": true` to have Claude read the transcript
+  and remove spoken flubs / false starts / "I forgot the script" / off-topic
+  tangents (things silence-cutting can't catch). Requires an Anthropic API key —
+  set `ANTHROPIC_API_KEY` in your environment (or `cuts.anthropic_api_key` in
+  config.yaml). Without a key it's simply skipped.
 - To **upload a file** instead of a URL, POST `multipart/form-data` with a
   `files` field (repeat `files` for multiple clips) and an optional `options`
   JSON string and `instructions` text.

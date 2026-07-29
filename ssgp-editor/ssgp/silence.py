@@ -115,6 +115,23 @@ def total_kept_duration(keeps: Sequence[Segment]) -> float:
     return sum(b - a for a, b in keeps)
 
 
+def subtract_ranges(keeps: Sequence[Segment], removals: Sequence[Segment], min_segment: float = 0.2) -> List[Segment]:
+    """Remove ``removals`` (e.g. AI-flagged flubs) from the kept segments."""
+    result = list(keeps)
+    for r0, r1 in removals:
+        nxt: List[Segment] = []
+        for a, b in result:
+            if r1 <= a or r0 >= b:      # no overlap
+                nxt.append((a, b))
+                continue
+            if r0 > a:                  # keep the head before the removal
+                nxt.append((a, r0))
+            if r1 < b:                  # keep the tail after the removal
+                nxt.append((r1, b))
+        result = nxt
+    return [(a, b) for a, b in result if (b - a) >= min_segment]
+
+
 def remap_words(words: Sequence[Word], keeps: Sequence[Segment]) -> List[Word]:
     """Map word timestamps from the original timeline onto the cut timeline."""
     # prefix offset for each keep segment

@@ -50,23 +50,40 @@ def _escape(text: str) -> str:
     return text.replace("\\", "\\\\").replace("{", "(").replace("}", ")").replace("\n", " ")
 
 
+def _ends_sentence(text: str) -> bool:
+    """True if a word ends a sentence (so the next caption line should start)."""
+    t = text.rstrip('"\')')
+    if not t:
+        return False
+    return t[-1] in ".!?" and not t[-1:].isdigit()
+
+
 def group_lines(words: Sequence[Word], max_chars: int, line_pause: float) -> List[List[Word]]:
-    """Group a flat word list into caption lines."""
+    """Group a flat word list into caption lines.
+
+    A new line starts when the current one would overflow, on a natural spoken
+    pause, OR right after a word that ends a sentence — so a caption never mixes
+    the tail of one sentence with the start of the next (which reads as
+    mistimed).
+    """
     lines: List[List[Word]] = []
     cur: List[Word] = []
     cur_len = 0
     prev_end = None
+    prev_ended_sentence = False
     for w in words:
         wlen = len(w.text)
         gap = (w.start - prev_end) if prev_end is not None else 0.0
         would_overflow = cur and (cur_len + 1 + wlen) > max_chars
         natural_break = cur and gap >= line_pause
-        if would_overflow or natural_break:
-            lines.append(cur)
+        if would_overflow or natural_break or prev_ended_sentence:
+            if cur:
+                lines.append(cur)
             cur, cur_len = [], 0
         cur.append(w)
         cur_len += (1 if cur_len else 0) + wlen
         prev_end = w.end
+        prev_ended_sentence = _ends_sentence(w.text)
     if cur:
         lines.append(cur)
     return lines

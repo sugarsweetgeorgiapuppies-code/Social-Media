@@ -113,6 +113,12 @@ def build_caption_track(
     """
     if not words:
         return None
+
+    # optional global timing nudge (seconds); negative = show captions earlier
+    offset = float(cap.get("time_offset", 0.0))
+    if offset:
+        words = [Word(text=w.text, start=max(0.0, w.start + offset), end=max(0.05, w.end + offset)) for w in words]
+
     cap_dir = work / "caps"
     cap_dir.mkdir(parents=True, exist_ok=True)
 
