@@ -104,12 +104,15 @@ def _draw_caption_frame(
 
 
 def build_caption_track(
-    words: Sequence[Word], cap: dict, fonts_dir: Path, W: int, H: int, work: Path
+    words: Sequence[Word], cap: dict, fonts_dir: Path, W: int, H: int, work: Path, fps: int = 30
 ) -> Optional[str]:
     """Render the animated caption line as a concat list of full-frame PNGs.
 
-    Returns the path to an ffconcat list file to be used as an overlay input,
-    or None if there are no words.
+    Every state is pinned to an ABSOLUTE timestamp and each concat duration is
+    just the gap to the next state. Nothing is ever clamped *up*, so durations
+    can never accumulate error — captions stay locked to the voice from the
+    first word to the last, no matter how close together real speech packs the
+    words. Returns the ffconcat list path, or None if there are no words.
     """
     if not words:
         return None
@@ -121,41 +124,47 @@ def build_caption_track(
 
     cap_dir = work / "caps"
     cap_dir.mkdir(parents=True, exist_ok=True)
-
-    transparent = cap_dir / "gap.png"
+    transparent = str((cap_dir / "gap.png").resolve())
     Image.new("RGBA", (W, H), (0, 0, 0, 0)).save(transparent)
 
     lines = group_lines(words, int(cap.get("max_chars_per_line", 22)), float(cap.get("line_pause", 0.7)))
-    states: List[Tuple[str, float]] = []
-    cursor = 0.0
+
+    # Build (absolute_time, image) events. A line shows word-by-word (each word
+    # highlighted at its own start), then blanks at the line's end.
+    events: List[Tuple[float, str]] = [(0.0, transparent)]
     n = 0
     for line in lines:
-        line_start = line[0].start
-        line_end = line[-1].end + 0.12
-        if line_start > cursor + 1e-3:
-            states.append((str(transparent), line_start - cursor))
         for i, w in enumerate(line):
-            seg_start = w.start
-            seg_end = line[i + 1].start if i + 1 < len(line) else line_end
-            dur = max(0.04, seg_end - seg_start)
             frame = _draw_caption_frame(line, i, cap, fonts_dir, W, H)
             fp = cap_dir / f"s{n:04d}.png"
             frame.save(fp)
-            states.append((str(fp), dur))
+            events.append((max(0.0, float(w.start)), str(fp.resolve())))
             n += 1
-        cursor = line_end
-    # small transparent tail so the last word doesn't linger
-    states.append((str(transparent), 0.2))
+        events.append((float(line[-1].end) + 0.10, transparent))  # blank after the line
+
+    # Sort by time and enforce strictly-increasing timeline. When two states are
+    # closer than one frame, keep the later image at the earlier time (drop the
+    # sub-frame gap) — this NEVER adds time, so there is zero drift.
+    events.sort(key=lambda e: e[0])
+    min_dt = 1.0 / max(1, fps)
+    pinned: List[Tuple[float, str]] = []
+    for t, p in events:
+        if pinned and t - pinned[-1][0] < min_dt:
+            pinned[-1] = (pinned[-1][0], p)  # replace image, keep the earlier time
+        else:
+            pinned.append((t, p))
 
     list_path = work / "captions.ffconcat"
     with open(list_path, "w", encoding="utf-8") as fh:
         fh.write("ffconcat version 1.0\n")
-        for path, dur in states:
-            # absolute path — concat resolves relative entries against the list's
-            # own directory, which would double the path
-            fh.write(f"file '{Path(path).resolve()}'\n")
+        for idx, (t, p) in enumerate(pinned):
+            nxt = pinned[idx + 1][0] if idx + 1 < len(pinned) else t + 0.3
+            dur = max(min_dt, nxt - t)
+            # absolute path — concat resolves relative entries against the list's dir
+            fh.write(f"file '{p}'\n")
             fh.write(f"duration {dur:.3f}\n")
-        fh.write(f"file '{Path(states[-1][0]).resolve()}'\n")
+        # concat needs the last file repeated to flush the final segment
+        fh.write(f"file '{pinned[-1][1]}'\n")
     return str(list_path)
 
 

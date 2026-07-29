@@ -125,7 +125,7 @@ def render_video(
     caption_list = None
     if words:
         progress(30, "captions")
-        caption_list = textrender.build_caption_track(words, cfg["captions"], fonts_dir, W, H, work)
+        caption_list = textrender.build_caption_track(words, cfg["captions"], fonts_dir, W, H, work, FPS)
 
     # ---- 5) style the FULL clip: reframe + zoom + captions + watermark -----
     progress(48, "video")
