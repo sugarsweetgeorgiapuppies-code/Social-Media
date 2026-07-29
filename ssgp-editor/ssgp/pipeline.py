@@ -20,6 +20,7 @@ import os
 from pathlib import Path
 from typing import Callable, List, Optional, Sequence, Tuple
 
+from . import dogcut
 from . import knowledge
 from . import music as music_mod
 from . import silence as silence_mod
@@ -143,11 +144,11 @@ def render_video(
     applied["watermark"] = bool(cfg["watermark"].get("enabled"))
     applied["captions"] = caption_list is not None
 
-    # ---- 6) plan cuts (silence + optional AI smart-cut) -------------------
+    # ---- 6) plan cuts (silence + optional AI smart-cut + dog-only) --------
     progress(70, "plan-cuts")
     keeps: List[Segment] = [(0.0, src_duration)]
+    c = cfg["cuts"]
     if want_cuts:
-        c = cfg["cuts"]
         silences = silence_mod.detect_silences(
             audio_wav,
             threshold_db=float(c.get("silence_threshold_db", -30)),
@@ -174,7 +175,18 @@ def render_video(
                 "removed": [[round(s, 2), round(e, 2)] for s, e in removals],
                 "reasons": sc.get("reasons", []),
             }
-        applied["segments_kept"] = len(keeps)
+
+    # Dog-only cut is visual — runs independently of silence trimming.
+    if c.get("dog_cut"):
+        progress(76, "dog-detect")
+        dc = dogcut.plan_removals(source_path, src_duration, c, work)
+        dremovals = dc.get("removals", [])
+        if dremovals:
+            keeps = silence_mod.subtract_ranges(keeps, dremovals, float(c.get("min_segment", 0.2)))
+        applied["dog_cut"] = {"status": dc.get("status"), "detail": dc.get("detail"),
+                              "removed": [[round(s, 2), round(e, 2)] for s, e in dremovals]}
+
+    applied["segments_kept"] = len(keeps)
 
     cut_duration = silence_mod.total_kept_duration(keeps)
     applied["output_duration"] = round(cut_duration, 2)
@@ -364,6 +376,23 @@ def _audio_pass(cut_path, dst, cfg, duration, has_voice, work, job_id, log_path)
     vol = float(m.get("volume", 0.18))
     atk = int(m.get("duck_attack", 5))
     rel = int(m.get("duck_release", 300))
+    replace_voice = bool(m.get("replace_voice", False))
+
+    # Music-only: drop the voice entirely and play the bed over the video.
+    # (Captions were already transcribed from the original voice earlier.)
+    if music_path and (replace_voice or not has_voice):
+        solo = float(m.get("solo_volume", 0.85)) if replace_voice else min(1.0, max(vol * 4, 0.6))
+        fade_out_st = max(0.0, dur - fo)
+        fc = (
+            f"[0:a]atrim=0:{dur:.3f},asetpts=PTS-STARTPTS,volume={solo},"
+            f"afade=t=in:st=0:d={fi},afade=t=out:st={fade_out_st:.3f}:d={fo}[a]"
+        )
+        run([
+            "ffmpeg", "-y", "-stream_loop", "-1", "-i", music_path,
+            "-filter_complex", fc, "-map", "[a]", "-t", f"{dur:.3f}",
+            "-c:a", "aac", "-b:a", cfg["output"].get("audio_bitrate", "192k"), dst,
+        ], log_path)
+        return os.path.basename(music_path) + " (voice removed)" if replace_voice else os.path.basename(music_path)
 
     # Case A: voice + music -> duck music under voice, then mix
     if has_voice and music_path:

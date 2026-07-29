@@ -1,13 +1,11 @@
 """Turn a plain-English instruction into concrete render option overrides.
 
-This lets you say things like:
-    "stitch these, no music, punchy zoom, all-caps captions, add the end card"
-and have it map onto the same options the API/UI use. It works with NO API key
-(keyword rules below). If ANTHROPIC_API_KEY is set, the model is used first for
-more nuanced parsing and we fall back to the rules if anything goes wrong.
-
-Returns (overrides_dict, matched_notes) — matched_notes is shown back to you so
-you can see how your words were interpreted.
+Understands the FULL toolset, so requests like:
+    "cut the parts without dogs, take the audio out and put music over it,
+     add your own captions, no watermark"
+actually change what gets rendered. Uses Claude when ANTHROPIC_API_KEY is set
+(richer understanding); otherwise falls back to keyword rules. Returns
+(overrides_dict, notes) — notes are shown back so you can see how it was read.
 """
 
 from __future__ import annotations
@@ -17,21 +15,50 @@ import os
 import re
 from typing import Dict, List, Tuple
 
+# What the instruction can control, described for the model.
+_CAPABILITIES = """
+Options you may set (include ONLY what the request asks for; omit the rest):
+- cuts.enabled (bool): trim silences / dead air.
+- cuts.min_gap (number, seconds): smaller = tighter, snappier cuts.
+- cuts.smart_cut (bool): use AI to cut spoken mistakes, false starts, "I forgot
+  the script", off-topic rambling.
+- cuts.dog_cut (bool): keep ONLY the parts of the video where a dog/puppy is
+  actually on screen; cut everything else. Use when they say things like "cut
+  the parts without dogs", "only show the puppies", "when there's no dog".
+- captions.enabled (bool): burned-in animated captions.
+- captions.uppercase (bool): ALL-CAPS captions.
+- captions.language (str, e.g. "es"): force a language.
+- zoom.enabled (bool), zoom.intensity (number ~0.03 subtle .. 0.12 strong).
+- music.enabled (bool): background music bed.
+- music.volume (number 0..1).
+- music.replace_voice (bool): remove the person's voice entirely and play only
+  music over the video. Use for "take the audio out and put music over it",
+  "no talking", "just music", "instrumental". (Captions are still generated
+  from what was said.)
+- watermark.enabled (bool).
+- cta.enabled (bool): the end card.
+"""
+
+
+def _strip_apos(s: str) -> str:
+    return s.replace("'", "").replace("’", "")
+
 
 def _has(text: str, *phrases: str) -> bool:
-    return any(re.search(r"\b" + re.escape(p) + r"\b", text) for p in phrases)
+    t = _strip_apos(text)  # so "don't" and "dont" both match
+    return any(re.search(r"\b" + re.escape(_strip_apos(p)) + r"\b", t) for p in phrases)
 
 
 def interpret(text: str, base_cfg: dict | None = None) -> Tuple[Dict, List[str]]:
     text = (text or "").strip()
     if not text:
         return {}, []
-
     if os.environ.get("ANTHROPIC_API_KEY"):
         try:
             return _interpret_llm(text)
-        except Exception:
-            pass  # fall through to rules
+        except Exception as exc:  # fall back, but leave a breadcrumb
+            rules, notes = _interpret_rules(text.lower())
+            return rules, notes + [f"(AI interpret failed: {type(exc).__name__}; used keywords)"]
     return _interpret_rules(text.lower())
 
 
@@ -43,49 +70,72 @@ def _interpret_rules(t: str) -> Tuple[Dict, List[str]]:
         o.setdefault(section, {})[key] = val
         notes.append(note)
 
-    # --- music ---
-    if _has(t, "no music", "without music", "mute music", "no background music", "no track"):
+    # music-only / remove voice
+    if _has(t, "take the audio out", "take audio out", "remove the audio", "remove audio",
+            "remove the voice", "no talking", "no voice", "mute the voice", "mute voice",
+            "just music", "music only", "only music", "instrumental", "put music over",
+            "music over it", "replace the audio", "silence the voice"):
+        o.setdefault("music", {}).update({"enabled": True, "replace_voice": True})
+        notes.append("music-only (voice removed)")
+    elif _has(t, "no music", "without music", "mute music", "no background music", "no track"):
         set_("music", "enabled", False, "music off")
     elif _has(t, "loud music", "louder music", "more music", "music up"):
         set_("music", "volume", 0.35, "music louder")
     elif _has(t, "quiet music", "soft music", "softer music", "music down", "subtle music"):
         set_("music", "volume", 0.10, "music quieter")
+    elif _has(t, "add music", "put music", "background music", "with music", "add a song"):
+        set_("music", "enabled", True, "music on")
 
-    # --- captions ---
+    # dog-only cutting (computer vision)
+    if _has(t, "cut the parts without dogs", "parts without dogs", "cut parts that don't have dogs",
+            "parts that don't have dogs", "only show dogs", "only show the dogs", "only the dogs",
+            "only show puppies", "only show the puppies", "show the puppies", "puppies only",
+            "only the puppies", "no dog", "without a dog", "where there's no dog",
+            "cut to dogs", "only parts with dogs", "only parts with puppies", "keep only the dogs",
+            "keep the dog parts"):
+        o.setdefault("cuts", {}).update({"enabled": True, "dog_cut": True})
+        notes.append("cut to dog moments only")
+
+    # captions
     if _has(t, "no captions", "without captions", "no subtitles", "no text"):
         set_("captions", "enabled", False, "captions off")
+    elif _has(t, "add captions", "add your own captions", "your own captions", "put captions",
+              "with captions", "caption it", "add subtitles"):
+        set_("captions", "enabled", True, "captions on")
     if _has(t, "all caps", "uppercase", "caps captions"):
         set_("captions", "uppercase", True, "uppercase captions")
 
-    # --- watermark ---
+    # smart cut (spoken mistakes)
+    if _has(t, "cut mistakes", "remove mistakes", "cut the flubs", "cut flubs", "smart cut",
+            "remove the mistakes", "cut out mistakes", "he messed up", "cut the bad takes"):
+        set_("cuts", "smart_cut", True, "AI smart-cut on")
+
+    # watermark
     if _has(t, "no watermark", "without watermark", "remove watermark", "no logo"):
         set_("watermark", "enabled", False, "watermark off")
 
-    # --- zoom / motion ---
+    # zoom / motion
     if _has(t, "no zoom", "static", "no motion", "no movement", "hold still"):
         set_("zoom", "enabled", False, "zoom off")
     elif _has(t, "punchy", "energetic", "more zoom", "dynamic", "lots of movement", "punch"):
-        o.setdefault("zoom", {}).update({"enabled": True, "intensity": 0.11, "punch_amount": 0.07})
-        notes.append("stronger zoom/punch")
+        o.setdefault("zoom", {}).update({"enabled": True, "intensity": 0.11})
+        notes.append("stronger zoom")
     elif _has(t, "subtle", "calm", "gentle", "slow", "minimal motion"):
         o.setdefault("zoom", {}).update({"enabled": True, "intensity": 0.04})
         notes.append("subtle zoom")
 
-    # --- cuts ---
+    # cuts pacing
     if _has(t, "don't cut", "do not cut", "no cuts", "keep pauses", "keep the pauses", "no trimming"):
         set_("cuts", "enabled", False, "auto-cuts off")
     elif _has(t, "tight", "cut more", "aggressive cuts", "fast paced", "snappy", "remove pauses"):
         o.setdefault("cuts", {}).update({"enabled": True, "min_gap": 0.35})
         notes.append("tighter cuts")
-    elif _has(t, "relaxed", "loose cuts", "keep it natural"):
-        o.setdefault("cuts", {}).update({"enabled": True, "min_gap": 0.9})
-        notes.append("looser cuts")
 
-    # --- CTA end card ---
+    # CTA
     if _has(t, "cta", "end card", "call to action", "outro", "add the card", "closing card"):
         set_("cta", "enabled", True, "CTA end card on")
 
-    # --- language ---
+    # language
     for lang, code in {"spanish": "es", "french": "fr", "german": "de", "portuguese": "pt"}.items():
         if _has(t, lang):
             set_("captions", "language", code, f"language: {code}")
@@ -94,29 +144,30 @@ def _interpret_rules(t: str) -> Tuple[Dict, List[str]]:
 
 
 def _interpret_llm(text: str) -> Tuple[Dict, List[str]]:
-    """Use Claude to map free text onto option overrides (optional, needs key)."""
+    """Use Claude to map free text onto option overrides (needs API key)."""
     import anthropic
 
     client = anthropic.Anthropic()
-    schema_hint = (
-        "Return ONLY compact JSON with a subset of these keys (omit anything not "
-        "mentioned): {\"cuts\":{\"enabled\":bool,\"min_gap\":num},"
-        "\"captions\":{\"enabled\":bool,\"uppercase\":bool,\"language\":str},"
-        "\"zoom\":{\"enabled\":bool,\"intensity\":num,\"punch_amount\":num},"
-        "\"music\":{\"enabled\":bool,\"volume\":num,\"track\":str},"
-        "\"watermark\":{\"enabled\":bool},\"cta\":{\"enabled\":bool,\"title\":str,"
-        "\"subtitle\":str,\"phone\":str}}"
+    system = (
+        "You configure a vertical-Reel video editor from a plain-English request. "
+        + _CAPABILITIES
+        + "\nReturn ONLY JSON: {\"options\": {nested overrides}, \"summary\": [short "
+        "human phrases of what you changed]}. Include only options the request "
+        "clearly implies. If it says to cut parts without dogs, set cuts.dog_cut "
+        "true. If it says take the audio out / put music over it, set "
+        "music.replace_voice true and music.enabled true."
     )
     msg = client.messages.create(
         model="claude-sonnet-5",
-        max_tokens=400,
-        system=(
-            "You translate a video editor's plain-English request into JSON option "
-            "overrides for a vertical-Reel renderer. " + schema_hint
-        ),
+        max_tokens=600,
+        system=system,
         messages=[{"role": "user", "content": text}],
     )
-    raw = "".join(block.text for block in msg.content if getattr(block, "type", "") == "text")
+    raw = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
     m = re.search(r"\{.*\}", raw, re.S)
-    overrides = json.loads(m.group(0)) if m else {}
-    return overrides, ["interpreted by Claude"]
+    data = json.loads(m.group(0)) if m else {}
+    overrides = data.get("options", data) if isinstance(data, dict) else {}
+    summary = data.get("summary") if isinstance(data, dict) else None
+    if not summary:
+        summary = ["interpreted by Claude"]
+    return overrides, [str(s) for s in summary]

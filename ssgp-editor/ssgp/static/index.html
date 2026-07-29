@@ -108,6 +108,8 @@
         <div class="toggle">Watermark <label class="switch"><input type="checkbox" id="t_watermark" checked><span class="slider-sw"></span></label></div>
         <div class="toggle">CTA end card <label class="switch"><input type="checkbox" id="t_cta"><span class="slider-sw"></span></label></div>
         <div class="toggle" title="Uses AI to cut spoken mistakes, false starts, and off-topic bits (needs an Anthropic API key)">Smart cut ✨ <label class="switch"><input type="checkbox" id="t_smart"><span class="slider-sw"></span></label></div>
+        <div class="toggle" title="Keep only the parts where a dog/puppy is on screen (needs: pip install ultralytics)">Cut to dogs 🐶 <label class="switch"><input type="checkbox" id="t_dogcut"><span class="slider-sw"></span></label></div>
+        <div class="toggle" title="Remove the voice and play only music over the video (captions still generated)">Music only 🎵 <label class="switch"><input type="checkbox" id="t_musiconly"><span class="slider-sw"></span></label></div>
         <div class="toggle" title="Make one finished Reel per clip instead of stitching them into one">Separate Reels <label class="switch"><input type="checkbox" id="t_separate"><span class="slider-sw"></span></label></div>
       </div>
       <div class="hint">Turn on <b>Separate Reels</b> to upload many clips and get one finished Reel back per clip. Leave it off to stitch clips into a single Reel.</div>
@@ -196,9 +198,10 @@ function collectOptions(){
   return {
     cuts: $('t_cuts').checked,
     smart_cut: $('t_smart').checked,
+    dog_cut: $('t_dogcut').checked,
     captions: { enabled: $('t_captions').checked, model: $('model').value, time_offset: parseFloat($('s_captime').value) },
     zoom: { enabled: $('t_zoom').checked, intensity: parseFloat($('s_zoom').value) },
-    music: { enabled: $('t_music').checked, volume: parseFloat($('s_music').value), track: $('track').value || null },
+    music: { enabled: $('t_music').checked, volume: parseFloat($('s_music').value), track: $('track').value || null, replace_voice: $('t_musiconly').checked },
     watermark: $('t_watermark').checked,
     cta: $('t_cta').checked,
     silence_threshold_db: parseInt($('s_sil').value,10),
@@ -305,6 +308,11 @@ async function checkStatus(id){
       const cls = s.status==='ok' ? 'ok' : (s.status==='error' ? 'err' : '');
       sc = '<div class="stage '+cls+'" style="margin-top:10px">✂️ Smart cut: '+(s.detail||s.status)+'</div>';
       if(s.reasons && s.reasons.length) sc += '<div class="chips">'+s.reasons.map(r=>'<span class="chip">cut: '+r+'</span>').join('')+'</div>';
+    }
+    // dog-only cut report
+    if(applied.dog_cut){
+      const d=applied.dog_cut; const cls=d.status==='ok'?'ok':(d.status==='error'?'err':'');
+      sc+='<div class="stage '+cls+'" style="margin-top:8px">🐶 Dog cut: '+(d.detail||d.status)+'</div>';
     }
     // breed-name corrections applied
     if(applied.corrections && applied.corrections.length){

@@ -61,6 +61,8 @@ def merge_options(cfg: Dict[str, Any], options: Dict[str, Any] | None) -> Dict[s
 _FLAT_MAP = {
     "cuts": ("cuts", "enabled"),
     "smart_cut": ("cuts", "smart_cut"),
+    "dog_cut": ("cuts", "dog_cut"),
+    "replace_voice": ("music", "replace_voice"),
     "captions": ("captions", "enabled"),
     "zoom": ("zoom", "enabled"),
     "music": ("music", "enabled"),

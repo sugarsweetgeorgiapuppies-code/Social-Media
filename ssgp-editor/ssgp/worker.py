@@ -63,9 +63,10 @@ class RenderWorker:
         notes: List[str] = []
         if job.instructions:
             interp, notes = instr_mod.interpret(job.instructions, cfg)
-            # explicit options take priority over interpreted ones
-            merged = _deep_merge(interp, overrides)
-            overrides = merged
+            # a typed instruction is an explicit intent — it wins over the
+            # baseline toggles for whatever it mentions (interp only contains
+            # what was actually requested, so untouched toggles are preserved).
+            overrides = _deep_merge(overrides, interp)
         cfg = merge_options(cfg, overrides)
 
         self.store.update(job_id, status="processing", stage="preparing", progress=1, notes=notes)

@@ -42,6 +42,16 @@ cuts:
   smart_cut_model: claude-sonnet-5
   smart_cut_instructions: null  # null = sensible default; or describe what to cut in plain English
 
+  # --- Dog-only cut: keep ONLY the parts of the video where a dog/puppy is
+  #     actually on screen, cut the rest. Uses on-device object detection.
+  #     Needs a one-time install:  pip install ultralytics
+  #     Off by default (it's slower + a bigger dependency). ---
+  dog_cut: false
+  dog_cut_sample_fps: 2       # how many frames per second to check for a dog
+  dog_cut_confidence: 0.35    # detection confidence threshold
+  dog_cut_pad: 0.4            # seconds kept on each side of a dog moment
+  dog_cut_min_gap: 0.6        # only cut no-dog stretches longer than this
+
 # ---------------------------------------------------------------------------
 # 2) AUTO CAPTIONS — transcribe locally with faster-whisper, then burn in
 #    animated word-by-word captions. No API key, runs on your machine.
@@ -100,6 +110,9 @@ music:
   track: null                # exact filename to use, e.g. "bed1.mp3"; null = pick per `selection`
   selection: random          # random | first | alphabetical  (used when track is null)
   volume: 0.18               # base music level (0..1) BEFORE ducking. 0.18 ≈ background level.
+  replace_voice: false       # true = remove the person's voice and play ONLY music over the video
+                             #        (captions are still generated from what was said)
+  solo_volume: 0.85          # music level when it's the only audio (replace_voice or silent source)
   duck_under_speech_db: -18  # music is pushed at least this far under the voice while Phil talks
   duck_attack: 5             # ms — how fast music drops when speech starts
   duck_release: 300          # ms — how fast music comes back when speech stops
