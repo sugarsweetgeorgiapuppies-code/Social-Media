@@ -20,7 +20,74 @@ from typing import List, Optional, Sequence, Tuple
 from PIL import Image, ImageDraw, ImageFont
 
 from .captions import group_lines
+from .config import ROOT
 from .transcribe import Word
+
+
+# ---------------------------------------------------------------------------
+# Logo helpers (watermark + CTA)
+# ---------------------------------------------------------------------------
+
+
+def _resolve_asset(path) -> Optional[Path]:
+    if not path:
+        return None
+    p = Path(path)
+    if not p.is_absolute():
+        p = ROOT / p
+    return p if p.exists() else None
+
+
+def _remove_white_bg(logo: "Image.Image", thresh: int = 35) -> "Image.Image":
+    """Make only the background-connected near-white transparent (flood-fill
+    from the corners), so interior white — like the dog's white body — stays."""
+    w, h = logo.size
+    rgb = logo.convert("RGB")
+    marker = (255, 0, 254)
+    filled = False
+    for c in ((0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)):
+        r, g, b = rgb.getpixel(c)
+        if r > 228 and g > 228 and b > 228:
+            ImageDraw.floodfill(rgb, c, marker, thresh=thresh)
+            filled = True
+    if not filled:
+        return logo  # already transparent, or no white border
+    out = logo.copy()
+    px, rp = out.load(), rgb.load()
+    for y in range(h):
+        for x in range(w):
+            if rp[x, y] == marker:
+                r, g, b, _a = px[x, y]
+                px[x, y] = (r, g, b, 0)
+    return out
+
+
+def _load_logo(path: Path, remove_bg: bool = True) -> "Image.Image":
+    logo = Image.open(path).convert("RGBA")
+    return _remove_white_bg(logo) if remove_bg else logo
+
+
+def _fit_width(logo: "Image.Image", target_w: float) -> "Image.Image":
+    tw = max(1, int(target_w))
+    th = max(1, int(logo.height * tw / logo.width))
+    return logo.resize((tw, th), Image.LANCZOS)
+
+
+def _apply_opacity(logo: "Image.Image", opacity: float) -> "Image.Image":
+    if opacity >= 0.999:
+        return logo
+    alpha = logo.getchannel("A").point(lambda v: int(v * opacity))
+    logo = logo.copy()
+    logo.putalpha(alpha)
+    return logo
+
+
+def _corner_xy(position: str, W: int, H: int, lw: int, lh: int, margin_pct: float) -> Tuple[int, int]:
+    m = int(min(W, H) * margin_pct)
+    position = (position or "bottom-right").lower()
+    x = W - lw - m if "right" in position else m
+    y = H - lh - m if "bottom" in position else m
+    return (x, y)
 
 _WEIGHT_FILE = {
     900: "Montserrat-ExtraBold.ttf",   # closest bundled
@@ -174,18 +241,26 @@ def build_caption_track(
 
 
 def render_watermark(wm: dict, fonts_dir: Path, W: int, H: int, out_png: Path) -> str:
+    """A see-through logo in a corner (preferred), or a text fallback if no logo
+    file is present at wm['logo']."""
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    opacity = float(wm.get("opacity", 0.88))
-    font = _font(fonts_dir, int(wm.get("font_weight", 700)), int(wm.get("font_size", 34)))
-    fill = _rgba(wm.get("fill_color", "#ffffff"), opacity)
-    stroke = _rgba(wm.get("stroke_color", "#1a1a1a"), opacity)
-    text = str(wm.get("text", ""))
-    y = int(float(wm.get("position_y_pct", 0.045)) * H)
-    draw.text(
-        (W / 2.0, y), text, font=font, fill=fill, anchor="ma",
-        stroke_width=int(wm.get("stroke_width", 2)), stroke_fill=stroke,
-    )
+    logo_path = _resolve_asset(wm.get("logo"))
+    if logo_path:
+        logo = _load_logo(logo_path, bool(wm.get("remove_white_bg", True)))
+        logo = _fit_width(logo, W * float(wm.get("logo_width_pct", 0.26)))
+        logo = _apply_opacity(logo, float(wm.get("logo_opacity", 0.35)))
+        pos = _corner_xy(wm.get("position", "bottom-right"), W, H, logo.width, logo.height,
+                         float(wm.get("margin_pct", 0.03)))
+        img.alpha_composite(logo, pos)
+    elif wm.get("text"):
+        draw = ImageDraw.Draw(img)
+        opacity = float(wm.get("opacity", 0.88))
+        font = _font(fonts_dir, int(wm.get("font_weight", 700)), int(wm.get("font_size", 34)))
+        fill = _rgba(wm.get("fill_color", "#ffffff"), opacity)
+        stroke = _rgba(wm.get("stroke_color", "#1a1a1a"), opacity)
+        y = int(float(wm.get("position_y_pct", 0.045)) * H)
+        draw.text((W / 2.0, y), str(wm["text"]), font=font, fill=fill, anchor="ma",
+                  stroke_width=int(wm.get("stroke_width", 2)), stroke_fill=stroke)
     img.save(out_png)
     return str(out_png)
 
@@ -196,26 +271,63 @@ def render_watermark(wm: dict, fonts_dir: Path, W: int, H: int, out_png: Path) -
 
 
 def render_cta_card(cta: dict, fonts_dir: Path, W: int, H: int, out_png: Path) -> str:
-    bg = _rgb(cta.get("background", "#1a1a1a"))
+    """Clean outro: logo up top, then business name, location, and a big tap-to-
+    call phone pill — name / number / location are the focus."""
+    bg = _rgb(cta.get("background", "#0f2439"))
     img = Image.new("RGB", (W, H), bg)
     draw = ImageDraw.Draw(img)
     weight = int(cta.get("font_weight", 800))
 
-    def fit_font(text: str, size: int) -> ImageFont.FreeTypeFont:
+    def fit(text: str, size: int, max_frac: float = 0.86) -> ImageFont.FreeTypeFont:
         f = _font(fonts_dir, weight, size)
-        while size > 28 and f.getlength(text) > W * 0.9:
-            size -= 4
+        while size > 26 and f.getlength(text) > W * max_frac:
+            size -= 3
             f = _font(fonts_dir, weight, size)
         return f
 
-    def center(text: str, size: int, color, y_frac: float):
+    def center(text: str, size: int, color, y: float):
         if not text:
             return
-        f = fit_font(text, size)
-        draw.text((W / 2.0, H * y_frac), text, font=f, fill=_rgb(color), anchor="mm")
+        f = fit(str(text), size)
+        draw.text((W / 2.0, y), str(text), font=f, fill=_rgb(color), anchor="mm")
 
-    center(str(cta.get("title", "")), int(cta.get("title_size", 76)), cta.get("title_color", "#ffffff"), 0.42)
-    center(str(cta.get("subtitle", "")), int(cta.get("subtitle_size", 46)), cta.get("title_color", "#ffffff"), 0.53)
-    center(str(cta.get("phone", "")), int(cta.get("phone_size", 64)), cta.get("accent_color", "#ffd24a"), 0.63)
+    # --- logo near the top ---
+    y = H * 0.30
+    logo_path = _resolve_asset(cta.get("logo"))
+    if logo_path:
+        logo = _load_logo(logo_path, bool(cta.get("remove_white_bg", True)))
+        logo = _fit_width(logo, W * float(cta.get("logo_width_pct", 0.62)))
+        lx, ly = int((W - logo.width) / 2), int(H * 0.15)
+        img.paste(logo, (lx, ly), logo)
+        y = ly + logo.height + int(H * 0.055)
+
+    name = cta.get("business") or cta.get("title") or ""
+    location = cta.get("location") or cta.get("subtitle") or ""
+    tagline = cta.get("cta_line") or ""
+    phone = str(cta.get("phone") or "")
+
+    if tagline:
+        center(tagline, int(cta.get("tagline_size", 50)), cta.get("muted_color", "#bcd3e6"), y)
+        y += H * 0.075
+    center(name, int(cta.get("name_size", 68)), cta.get("title_color", "#ffffff"), y + H * 0.02)
+    y += H * 0.095
+    center(location, int(cta.get("location_size", 46)), cta.get("muted_color", "#bcd3e6"), y)
+    y += H * 0.085
+
+    # --- phone as a bright tap-to-call pill (the focus) ---
+    if phone:
+        f = fit(phone, int(cta.get("phone_size", 82)), max_frac=0.7)
+        tw = f.getlength(phone)
+        try:
+            asc, desc = f.getmetrics()
+            th = asc + desc
+        except Exception:
+            th = int(cta.get("phone_size", 82))
+        pad_x, pad_y = int(W * 0.055), int(th * 0.42)
+        cx, cy = W / 2.0, y + th * 0.1
+        box = [cx - tw / 2 - pad_x, cy - th / 2 - pad_y, cx + tw / 2 + pad_x, cy + th / 2 + pad_y]
+        draw.rounded_rectangle(box, radius=int(th * 0.7 + pad_y), fill=_rgb(cta.get("accent_color", "#ffd23f")))
+        draw.text((cx, cy), phone, font=f, fill=_rgb(cta.get("phone_text_color", cta.get("background", "#0f2439"))), anchor="mm")
+
     img.save(out_png)
     return str(out_png)

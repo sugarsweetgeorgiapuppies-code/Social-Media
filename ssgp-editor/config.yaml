@@ -111,14 +111,24 @@ music:
 # ---------------------------------------------------------------------------
 watermark:
   enabled: true
+  # Drop your logo at assets/logo.png (transparent PNG is best; a white
+  # background is removed automatically). When present, a faint logo is placed
+  # in a corner. If the file is missing, the text below is used instead.
+  logo: assets/logo.png
+  logo_opacity: 0.35         # super see-through
+  logo_width_pct: 0.26       # logo width as a fraction of frame width
+  position: bottom-right     # bottom-right | bottom-left | top-right | top-left
+  margin_pct: 0.03           # gap from the edge
+  remove_white_bg: true      # auto-make a white background transparent
+  # text fallback (only used if assets/logo.png is missing):
   text: "Sugar Sweet Georgia Puppies · Lawrenceville, GA"
-  font_weight: 700           # 700 = Bold (maps to fonts/Montserrat-Bold.ttf)
+  font_weight: 700
   font_size: 34
   fill_color: "#ffffff"
   stroke_color: "#1a1a1a"
-  stroke_width: 2            # thin dark stroke
-  opacity: 0.88             # ~88%
-  position_y_pct: 0.045     # distance from the top as a fraction of height
+  stroke_width: 2
+  opacity: 0.88
+  position_y_pct: 0.045
 
 # ---------------------------------------------------------------------------
 # 6) CTA END CARD — optional 1.5–2s outro. OFF by default so a render never
@@ -126,17 +136,27 @@ watermark:
 # ---------------------------------------------------------------------------
 cta:
   enabled: false
-  duration: 1.8              # seconds (1.5–2.0 recommended)
-  background: "#1a1a1a"      # card background colour
-  title: "Come meet our puppies"
-  subtitle: "Lawrenceville, GA"
+  duration: 2.2              # seconds
+  background: "#0f2439"      # brand navy
+  logo: assets/logo.png      # shown at the top of the card (auto white-removal)
+  logo_width_pct: 0.62
+  remove_white_bg: true
+  # The focus: name, number, location
+  business: "Sugar Sweet Georgia Puppies"
+  location: "Lawrenceville, GA"
   phone: "(678) 253-4081"
-  title_color: "#ffffff"
-  accent_color: "#ffd24a"    # colour for the phone number
+  cta_line: "Come meet your new best friend"   # small line above the name (optional)
+  # colours
+  title_color: "#ffffff"     # business name
+  muted_color: "#bcd3e6"     # tagline + location
+  accent_color: "#ffd23f"    # phone pill background (brand yellow)
+  phone_text_color: "#0f2439" # phone text on the yellow pill
   font_weight: 800
-  title_size: 76             # auto-shrinks further if the title is very long
-  subtitle_size: 46
-  phone_size: 64
+  # sizes (auto-shrink to fit width)
+  tagline_size: 50
+  name_size: 68
+  location_size: 46
+  phone_size: 82
 
 # ---------------------------------------------------------------------------
 # Folders + server. Sources are downloaded to `work` and cleaned up after;
