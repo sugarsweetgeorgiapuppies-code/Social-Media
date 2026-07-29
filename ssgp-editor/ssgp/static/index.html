@@ -127,6 +127,10 @@
         <span class="val" id="v_sil">-30 dB</span><label style="margin:0">Silence threshold</label>
         <input type="range" id="s_sil" min="-50" max="-10" step="1" value="-30">
       </div>
+      <div class="range">
+        <span class="val" id="v_captime">0.00s</span><label style="margin:0">Caption timing (− earlier · + later)</label>
+        <input type="range" id="s_captime" min="-1.5" max="1.5" step="0.05" value="0">
+      </div>
       <div class="row">
         <div style="flex:1; min-width:150px;">
           <label>Caption model</label>
@@ -170,6 +174,7 @@ const bind = (slider, out, fmt) => {
 bind('s_music','v_music');
 bind('s_zoom','v_zoom');
 bind('s_sil','v_sil', v => v + ' dB');
+bind('s_captime','v_captime', v => (v>0?'+':'') + parseFloat(v).toFixed(2) + 's');
 
 // load music tracks + config defaults
 fetch('/api/music').then(r=>r.json()).then(d=>{
@@ -191,7 +196,7 @@ function collectOptions(){
   return {
     cuts: $('t_cuts').checked,
     smart_cut: $('t_smart').checked,
-    captions: { enabled: $('t_captions').checked, model: $('model').value },
+    captions: { enabled: $('t_captions').checked, model: $('model').value, time_offset: parseFloat($('s_captime').value) },
     zoom: { enabled: $('t_zoom').checked, intensity: parseFloat($('s_zoom').value) },
     music: { enabled: $('t_music').checked, volume: parseFloat($('s_music').value), track: $('track').value || null },
     watermark: $('t_watermark').checked,
