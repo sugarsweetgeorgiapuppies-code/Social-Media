@@ -150,20 +150,20 @@ watermark:
 cta:
   enabled: false
   duration: 2.2              # seconds
-  background: "#0f2439"      # brand navy
+  background: "#ffffff"      # white — so the full colour logo (incl. navy text) shows
   logo: assets/logo.png      # shown at the top of the card (auto white-removal)
-  logo_width_pct: 0.62
+  logo_width_pct: 0.66
   remove_white_bg: true
   # The focus: name, number, location
   business: "Sugar Sweet Georgia Puppies"
   location: "Lawrenceville, GA"
   phone: "(678) 253-4081"
   cta_line: "Come meet your new best friend"   # small line above the name (optional)
-  # colours
-  title_color: "#ffffff"     # business name
-  muted_color: "#bcd3e6"     # tagline + location
+  # colours (tuned for a white card)
+  title_color: "#12263a"     # business name (navy)
+  muted_color: "#5b6b7a"     # tagline + location (slate)
   accent_color: "#ffd23f"    # phone pill background (brand yellow)
-  phone_text_color: "#0f2439" # phone text on the yellow pill
+  phone_text_color: "#12263a" # phone text on the yellow pill
   font_weight: 800
   # sizes (auto-shrink to fit width)
   tagline_size: 50
