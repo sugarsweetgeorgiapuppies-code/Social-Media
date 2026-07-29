@@ -1,68 +1,84 @@
 # ============================================================================
-#  SSGP Editor — Knowledge base
+#  SSGP Editor — Knowledge base   (Sugar Sweet Georgia Puppies)
 #  Teaches the caption transcriber your store's vocabulary so it stops
-#  mishearing breed names (e.g. "dachshund" as "docks", "maltipoo" as
-#  "multi poo"). Two parts:
-#    1) breeds/terms  -> fed to the transcriber up front so it EXPECTS these
-#                        words (context: it's a puppy store).
-#    2) corrections   -> exact auto-replacements for known mishears.
-#  Add your own anytime — just edit this file and re-render. No code changes.
+#  mishearing breed names (e.g. "dachshund" -> "docks", "maltipoo" ->
+#  "multi poo", "frenchton" -> "french ton").
+#    1) breeds/terms -> handed to the transcriber up front so it EXPECTS these
+#                       words (context: it's a puppy store).
+#    2) corrections  -> exact auto-replacements for known mishears.
+#  Breeds pulled from georgiapuppiesfromheaven.com. Add your own anytime —
+#  just edit this file and re-render. No code changes.
 # ============================================================================
 
-# The store + place, so it spells these right too.
 terms:
   - Sugar Sweet Georgia Puppies
+  - Georgia Puppies From Heaven
   - Lawrenceville, Georgia
   - teacup
   - micro
-  - AKC registered
   - hypoallergenic
+  - AKC registered
+  - designer breed
 
-# Breeds you carry. The transcriber is told these are likely, so if a
-# dachshund is in the video it hears "dachshund", not "docks".
+# --- Breeds you carry (purebred + designer) ---
 breeds:
+  # Purebred / toy
+  - Shih Tzu
+  - Maltese
   - Dachshund
   - Mini Dachshund
-  - Maltipoo
-  - Maltese
-  - Morkie
-  - Yorkie
-  - Yorkshire Terrier
-  - Yorkiepoo
-  - Shih Tzu
-  - Shihpoo
+  - Chihuahua
+  - Havanese
   - Poodle
   - Toy Poodle
   - Mini Poodle
+  - Pomeranian
+  - Yorkie
+  - Yorkshire Terrier
+  - Westie
+  - West Highland White Terrier
+  - Pekingese
+  - Bichon Frise
+  - Cavalier King Charles Spaniel
+  - French Bulldog
+  - Frenchie
+  - Boston Terrier
+  - Schnauzer
+  - Mini Schnauzer
+  - Papillon
+  - Coton de Tulear
+  - Lhasa Apso
+  - Pug
+  - Corgi
+  # Designer / mixes
+  - Maltipoo
+  - Cavapoo
+  - Cavachon
+  - Cavapoochon
+  - Cockapoo
+  - Shihpoo
+  - Yorkiepoo
+  - Morkie
+  - Shorkie
+  - Snorkie
+  - Westiepoo
+  - Peke-A-Chon
+  - Frenchton
+  - Havapoo
+  - Maltshi
+  - Schnoodle
+  - Poochon
   - Goldendoodle
   - Mini Goldendoodle
   - Bernedoodle
   - Sheepadoodle
-  - Cockapoo
-  - Cavapoo
-  - Cavachon
-  - Cavalier King Charles Spaniel
-  - Bichon Frise
-  - Havanese
-  - Pomeranian
   - Pomsky
-  - Chihuahua
-  - French Bulldog
-  - Frenchie
-  - Boston Terrier
-  - Corgi
-  - Schnoodle
-  - Schnauzer
-  - Mini Schnauzer
-  - Pekingese
-  - Papillon
-  - Coton de Tulear
   - Teddy Bear
 
-# Known mishears -> what they should be. Left side is what Whisper tends to
-# type (case-insensitive; can be multiple words); right side is the fix.
-# Add a line whenever you spot a new one.
+# --- Known mishears -> the fix (left side is case-insensitive; may be several
+#     words that collapse into one, e.g. "multi poo" -> "Maltipoo"). ---
 corrections:
+  # Dachshund
   docks: Dachshund
   dox: Dachshund
   doxin: Dachshund
@@ -70,24 +86,66 @@ corrections:
   dashhound: Dachshund
   dash hound: Dachshund
   duck sund: Dachshund
+  # Maltipoo
   "multi poo": Maltipoo
   "malty poo": Maltipoo
   "molty poo": Maltipoo
   "malta poo": Maltipoo
   "maltie poo": Maltipoo
+  # Cavapoo / Cavapoochon / Cavachon
   "cava poo": Cavapoo
   "cabo poo": Cavapoo
+  "cava poochon": Cavapoochon
+  "cavapoo shon": Cavapoochon
+  "cava chon": Cavachon
+  "cava shon": Cavachon
+  # Cockapoo
   "cocka poo": Cockapoo
-  "golden doodle": Goldendoodle
-  "bernie doodle": Bernedoodle
-  "sheep a doodle": Sheepadoodle
+  "coca poo": Cockapoo
+  # Shihpoo / Shih Tzu
+  "shih poo": Shihpoo
+  "she poo": Shihpoo
   "shih tzu": Shih Tzu
   shitzu: Shih Tzu
   "sheet zoo": Shih Tzu
   "she zoo": Shih Tzu
+  # Yorkiepoo / Morkie / Shorkie / Snorkie
+  "yorkie poo": Yorkiepoo
+  "yorky poo": Yorkiepoo
   morky: Morkie
-  yorky: Yorkie
-  "pom sky": Pomsky
+  "more key": Morkie
+  shorky: Shorkie
+  "shore key": Shorkie
+  snorky: Snorkie
+  "snore key": Snorkie
+  # Westie / Westiepoo
+  westy: Westie
+  "west e": Westie
+  "westie poo": Westiepoo
+  "west a poo": Westiepoo
+  # Peke-A-Chon
+  "peek a shon": Peke-A-Chon
+  "pika shon": Peke-A-Chon
+  "peek a chon": Peke-A-Chon
+  # Frenchton / Frenchie
+  "french ton": Frenchton
+  "french tan": Frenchton
   frenchy: Frenchie
+  # Havapoo / Havanese
+  "hava poo": Havapoo
+  "have a poo": Havapoo
   havenese: Havanese
+  # Maltshi
+  "mal shi": Maltshi
+  "molt she": Maltshi
+  # Doodles
+  "golden doodle": Goldendoodle
+  "bernie doodle": Bernedoodle
+  "sheep a doodle": Sheepadoodle
+  snoodle: Schnoodle
+  # Pomsky / Poochon
+  "pom sky": Pomsky
+  "poo chon": Poochon
+  # Coton de Tulear
   "coton de tulear": Coton de Tulear
+  "cotton de tulear": Coton de Tulear
