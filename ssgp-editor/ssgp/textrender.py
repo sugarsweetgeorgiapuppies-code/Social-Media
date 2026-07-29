@@ -38,6 +38,23 @@ def _resolve_asset(path) -> Optional[Path]:
     return p if p.exists() else None
 
 
+_LOGO_EXT = {".png", ".jpg", ".jpeg", ".webp"}
+
+
+def _resolve_logo(path) -> Optional[Path]:
+    """Find the logo: the configured path if it exists, otherwise ANY image
+    dropped in the assets/ folder (so the exact filename doesn't matter)."""
+    p = _resolve_asset(path)
+    if p:
+        return p
+    assets = ROOT / "assets"
+    if assets.exists():
+        imgs = sorted(f for f in assets.iterdir() if f.suffix.lower() in _LOGO_EXT)
+        if imgs:
+            return imgs[0]
+    return None
+
+
 def _remove_white_bg(logo: "Image.Image", thresh: int = 35) -> "Image.Image":
     """Make only the background-connected near-white transparent (flood-fill
     from the corners), so interior white — like the dog's white body — stays."""
@@ -244,7 +261,7 @@ def render_watermark(wm: dict, fonts_dir: Path, W: int, H: int, out_png: Path) -
     """A see-through logo in a corner (preferred), or a text fallback if no logo
     file is present at wm['logo']."""
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    logo_path = _resolve_asset(wm.get("logo"))
+    logo_path = _resolve_logo(wm.get("logo"))
     if logo_path:
         logo = _load_logo(logo_path, bool(wm.get("remove_white_bg", True)))
         logo = _fit_width(logo, W * float(wm.get("logo_width_pct", 0.26)))
@@ -293,7 +310,7 @@ def render_cta_card(cta: dict, fonts_dir: Path, W: int, H: int, out_png: Path) -
 
     # --- logo near the top ---
     y = H * 0.30
-    logo_path = _resolve_asset(cta.get("logo"))
+    logo_path = _resolve_logo(cta.get("logo"))
     if logo_path:
         logo = _load_logo(logo_path, bool(cta.get("remove_white_bg", True)))
         logo = _fit_width(logo, W * float(cta.get("logo_width_pct", 0.62)))
