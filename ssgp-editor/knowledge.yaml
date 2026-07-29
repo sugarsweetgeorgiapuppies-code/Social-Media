@@ -10,15 +10,62 @@
 #  just edit this file and re-render. No code changes.
 # ============================================================================
 
+# --- People on camera (staff / owners). Names get mish' heard a lot, so these
+#     are fed to the transcriber up front. Add everyone who appears/speaks. ---
+names:
+  - Phil
+  - Lori
+
+# --- Store vocabulary + places + colors the team says on camera. Priming the
+#     transcriber with these stops "hypoallergenic" turning into "hypo
+#     allergenic", etc. Add your own words freely. ---
 terms:
+  # store + place
   - Sugar Sweet Georgia Puppies
   - Georgia Puppies From Heaven
   - Lawrenceville, Georgia
+  - Gwinnett
+  - Atlanta
+  # health / care
+  - hypoallergenic
+  - non-shedding
+  - low-shedding
+  - vet-checked
+  - veterinarian
+  - health guarantee
+  - health certificate
+  - vaccinated
+  - vaccinations
+  - dewormed
+  - microchipped
+  - microchip
+  - spayed
+  - neutered
+  - potty trained
+  - crate trained
+  - well-socialized
+  - family-raised
+  - temperament
+  # registration / type
+  - AKC registered
+  - CKC registered
+  - purebred
+  - designer breed
   - teacup
   - micro
-  - hypoallergenic
-  - AKC registered
-  - designer breed
+  - toy
+  - mini
+  # coat colors / patterns
+  - apricot
+  - cream
+  - sable
+  - merle
+  - brindle
+  - parti
+  - phantom
+  - tri-color
+  - ruby
+  - Blenheim
 
 # --- Breeds you carry (purebred + designer) ---
 breeds:
@@ -149,3 +196,23 @@ corrections:
   # Coton de Tulear
   "coton de tulear": Coton de Tulear
   "cotton de tulear": Coton de Tulear
+  # Store terms (safe, unambiguous mishears only)
+  "hypo allergenic": hypoallergenic
+  "hyper allergenic": hypoallergenic
+  "hypoallergic": hypoallergenic
+  "micro chipped": microchipped
+  "micro chip": microchip
+  "de wormed": dewormed
+  "de worming": deworming
+  "non shedding": non-shedding
+  "low shedding": low-shedding
+  "vet checked": vet-checked
+  "a k c": AKC
+  "c k c": CKC
+  # Names — only spellings that aren't real words (Phil/Lori are primed above;
+  # we don't blanket-correct "fill"/"feel"/"laurie the name" to avoid errors)
+  fil: Phil
+  phill: Phil
+  lorie: Lori
+  lorri: Lori
+  laurie: Lori

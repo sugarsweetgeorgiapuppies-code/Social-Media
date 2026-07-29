@@ -25,6 +25,7 @@ def load_knowledge(path: str | None = None) -> Dict:
         return {"breeds": [], "terms": [], "corrections": {}}
     data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
     return {
+        "names": data.get("names") or [],
         "breeds": data.get("breeds") or [],
         "terms": data.get("terms") or [],
         "corrections": data.get("corrections") or {},
@@ -32,12 +33,19 @@ def load_knowledge(path: str | None = None) -> Dict:
 
 
 def build_prompt(k: Dict) -> str | None:
-    """A short context string that primes Whisper toward the store vocabulary."""
-    parts: List[str] = ["A video from a puppy store."]
+    """A context string that primes Whisper toward the store vocabulary.
+
+    Whisper only keeps roughly the last ~220 tokens of the prompt, so the most
+    valuable, most-mangled words (names, then breeds) go LAST to stay in the
+    retained window.
+    """
+    parts: List[str] = ["A video from Sugar Sweet Georgia Puppies, a puppy store in Lawrenceville, Georgia."]
     if k.get("terms"):
-        parts.append(", ".join(str(t) for t in k["terms"]) + ".")
+        parts.append("Words: " + ", ".join(str(t) for t in k["terms"]) + ".")
     if k.get("breeds"):
         parts.append("Breeds: " + ", ".join(str(b) for b in k["breeds"]) + ".")
+    if k.get("names"):  # names last so they stay in Whisper's retained window
+        parts.append("People: " + ", ".join(str(n) for n in k["names"]) + ".")
     prompt = " ".join(parts).strip()
     return prompt or None
 
