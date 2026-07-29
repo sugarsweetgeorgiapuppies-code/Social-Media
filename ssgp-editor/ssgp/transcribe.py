@@ -56,8 +56,13 @@ def transcribe_words(
     compute_type: str = "int8",
     device: str = "auto",
     beam_size: int = 5,
+    initial_prompt: Optional[str] = None,
 ) -> List[Word]:
-    """Transcribe ``audio_path`` and return a flat list of timed words."""
+    """Transcribe ``audio_path`` and return a flat list of timed words.
+
+    ``initial_prompt`` primes the model with expected vocabulary (breed names,
+    store terms) so it stops mishearing them.
+    """
     whisper = _get_model(model, device, compute_type)
     segments, _info = whisper.transcribe(
         audio_path,
@@ -65,6 +70,7 @@ def transcribe_words(
         beam_size=beam_size,
         word_timestamps=True,
         vad_filter=False,  # we do our own silence handling in silence.py
+        initial_prompt=initial_prompt,
     )
 
     words: List[Word] = []

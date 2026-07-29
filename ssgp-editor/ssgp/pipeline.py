@@ -20,6 +20,7 @@ import os
 from pathlib import Path
 from typing import Callable, List, Optional, Sequence, Tuple
 
+from . import knowledge
 from . import music as music_mod
 from . import silence as silence_mod
 from . import smartcut
@@ -101,6 +102,7 @@ def render_video(
             applied["transcript_source"] = "provided"
         else:
             try:
+                know = knowledge.load_knowledge()
                 words = transcribe_words(
                     audio_wav,
                     model=cap.get("model", "base"),
@@ -108,9 +110,14 @@ def render_video(
                     compute_type=cap.get("compute_type", "int8"),
                     device=cap.get("device", "auto"),
                     beam_size=int(cap.get("beam_size", 5)),
+                    initial_prompt=knowledge.build_prompt(know),
                 )
                 applied["words"] = len(words)
                 applied["transcript_source"] = "whisper"
+                # auto-fix known breed-name mishears (docks -> Dachshund, ...)
+                words, fixes = knowledge.correct_words(words, know.get("corrections", {}))
+                if fixes:
+                    applied["corrections"] = fixes
             except Exception as exc:  # transcription failed (e.g. model download blocked)
                 applied["captions_error"] = str(exc)
                 words = []

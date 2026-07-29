@@ -306,6 +306,11 @@ async function checkStatus(id){
       sc = '<div class="stage '+cls+'" style="margin-top:10px">✂️ Smart cut: '+(s.detail||s.status)+'</div>';
       if(s.reasons && s.reasons.length) sc += '<div class="chips">'+s.reasons.map(r=>'<span class="chip">cut: '+r+'</span>').join('')+'</div>';
     }
+    // breed-name corrections applied
+    if(applied.corrections && applied.corrections.length){
+      sc += '<div class="stage ok" style="margin-top:8px">🐶 Fixed breed names</div><div class="chips">'+
+        applied.corrections.map(c=>'<span class="chip">'+c+'</span>').join('')+'</div>';
+    }
     // transcript (so you can see what it heard)
     let tr = '';
     if(applied.transcript) tr = '<details style="margin-top:10px"><summary class="hint">What it heard (transcript)</summary><div class="hint" style="margin-top:6px">'+applied.transcript+'</div></details>';

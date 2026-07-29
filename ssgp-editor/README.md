@@ -259,6 +259,20 @@ per-job via the API `options` or the UI controls.
 Key sections: `output`, `cuts`, `captions`, `zoom`, `music`, `watermark`, `cta`,
 `paths`, `server`.
 
+### Knowledge base (breed names)
+
+`knowledge.yaml` teaches the caption transcriber your store's vocabulary so it
+stops mishearing breeds (e.g. "dachshund" → "docks", "maltipoo" → "multi poo"):
+
+- `breeds` / `terms` — handed to the transcriber up front so it *expects* these
+  words (it's a puppy store, so a dachshund is heard as "dachshund").
+- `corrections` — exact auto-replacements for known mishears (`docks:
+  Dachshund`, `"multi poo": Maltipoo`, …). Left side is case-insensitive and can
+  be several words; the right side is the fix.
+
+Add your own breeds and mishears anytime — just edit the file and re-render. The
+result panel lists any breed-name fixes it applied.
+
 ---
 
 ## 7. Folders

@@ -1,0 +1,93 @@
+# ============================================================================
+#  SSGP Editor — Knowledge base
+#  Teaches the caption transcriber your store's vocabulary so it stops
+#  mishearing breed names (e.g. "dachshund" as "docks", "maltipoo" as
+#  "multi poo"). Two parts:
+#    1) breeds/terms  -> fed to the transcriber up front so it EXPECTS these
+#                        words (context: it's a puppy store).
+#    2) corrections   -> exact auto-replacements for known mishears.
+#  Add your own anytime — just edit this file and re-render. No code changes.
+# ============================================================================
+
+# The store + place, so it spells these right too.
+terms:
+  - Sugar Sweet Georgia Puppies
+  - Lawrenceville, Georgia
+  - teacup
+  - micro
+  - AKC registered
+  - hypoallergenic
+
+# Breeds you carry. The transcriber is told these are likely, so if a
+# dachshund is in the video it hears "dachshund", not "docks".
+breeds:
+  - Dachshund
+  - Mini Dachshund
+  - Maltipoo
+  - Maltese
+  - Morkie
+  - Yorkie
+  - Yorkshire Terrier
+  - Yorkiepoo
+  - Shih Tzu
+  - Shihpoo
+  - Poodle
+  - Toy Poodle
+  - Mini Poodle
+  - Goldendoodle
+  - Mini Goldendoodle
+  - Bernedoodle
+  - Sheepadoodle
+  - Cockapoo
+  - Cavapoo
+  - Cavachon
+  - Cavalier King Charles Spaniel
+  - Bichon Frise
+  - Havanese
+  - Pomeranian
+  - Pomsky
+  - Chihuahua
+  - French Bulldog
+  - Frenchie
+  - Boston Terrier
+  - Corgi
+  - Schnoodle
+  - Schnauzer
+  - Mini Schnauzer
+  - Pekingese
+  - Papillon
+  - Coton de Tulear
+  - Teddy Bear
+
+# Known mishears -> what they should be. Left side is what Whisper tends to
+# type (case-insensitive; can be multiple words); right side is the fix.
+# Add a line whenever you spot a new one.
+corrections:
+  docks: Dachshund
+  dox: Dachshund
+  doxin: Dachshund
+  doxen: Dachshund
+  dashhound: Dachshund
+  dash hound: Dachshund
+  duck sund: Dachshund
+  "multi poo": Maltipoo
+  "malty poo": Maltipoo
+  "molty poo": Maltipoo
+  "malta poo": Maltipoo
+  "maltie poo": Maltipoo
+  "cava poo": Cavapoo
+  "cabo poo": Cavapoo
+  "cocka poo": Cockapoo
+  "golden doodle": Goldendoodle
+  "bernie doodle": Bernedoodle
+  "sheep a doodle": Sheepadoodle
+  "shih tzu": Shih Tzu
+  shitzu: Shih Tzu
+  "sheet zoo": Shih Tzu
+  "she zoo": Shih Tzu
+  morky: Morkie
+  yorky: Yorkie
+  "pom sky": Pomsky
+  frenchy: Frenchie
+  havenese: Havanese
+  "coton de tulear": Coton de Tulear
