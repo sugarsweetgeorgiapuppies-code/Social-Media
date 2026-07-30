@@ -57,11 +57,44 @@ def interpret(text: str, base_cfg: dict | None = None) -> Tuple[Dict, List[str]]
         return {}, []
     if os.environ.get("ANTHROPIC_API_KEY"):
         try:
-            return _interpret_llm(text)
+            o, notes = _interpret_llm(text)
         except Exception as exc:  # fall back, but leave a breadcrumb
-            rules, notes = _interpret_rules(text.lower())
-            return rules, notes + [f"(AI interpret failed: {type(exc).__name__}; used keywords)"]
-    return _interpret_rules(text.lower())
+            o, notes = _interpret_rules(text.lower())
+            notes = notes + [f"(AI interpret failed: {type(exc).__name__}; used keywords)"]
+    else:
+        o, notes = _interpret_rules(text.lower())
+
+    # Always apply these deterministic parses on top (reliable, not model-guessed):
+    # explicit word corrections ("change X to Y") and protect-the-ending.
+    corr = _parse_corrections(text)
+    if corr:
+        o.setdefault("captions", {}).setdefault("corrections", {}).update(corr)
+        notes.append("fix words: " + ", ".join(f"{k}→{v}" for k, v in corr.items()))
+    if _has(text.lower(), "cut off the last", "cut off the end", "don't cut the end",
+            "dont cut the end", "keep the ending", "keep the end", "cut the last word",
+            "cut off the last word", "last word got cut", "ending got cut"):
+        o.setdefault("cuts", {}).update({"keep_pad": 0.5, "min_gap": 0.8})
+        notes.append("protect the ending")
+    return o, notes
+
+
+def _parse_corrections(text: str) -> Dict[str, str]:
+    """Pull explicit caption fixes out of the text: 'change X to Y',
+    'fix X to Y', 'replace X with Y', 'say Y not X'. Returns {wrong: right}."""
+    out: Dict[str, str] = {}
+
+    def clean(s: str) -> str:
+        return s.strip().strip('"\'“”').strip().rstrip(".,!?")
+
+    for m in re.finditer(r"\b(?:change|fix|replace|correct|swap)\s+(.+?)\s+(?:to|with|into|for)\s+(.+?)(?:[.,;]|$)", text, re.I):
+        wrong, right = clean(m.group(1)), clean(m.group(2))
+        if wrong and right and wrong.lower() != right.lower():
+            out[wrong] = right
+    for m in re.finditer(r"\b(?:it should say|should say|should be|say)\s+(.+?)\s+not\s+(.+?)(?:[.,;]|$)", text, re.I):
+        right, wrong = clean(m.group(1)), clean(m.group(2))
+        if wrong and right and wrong.lower() != right.lower():
+            out[wrong] = right
+    return out
 
 
 def _interpret_rules(t: str) -> Tuple[Dict, List[str]]:

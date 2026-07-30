@@ -125,6 +125,13 @@ def render_video(
                 applied["captions_error"] = str(exc)
                 words = []
 
+        # per-render caption fixes typed by the user ("change X to Y")
+        job_corr = cap.get("corrections")
+        if words and job_corr:
+            words, jf = knowledge.correct_words(words, job_corr)
+            if jf:
+                applied.setdefault("corrections", []).extend(jf)
+
     if words:
         applied["transcript"] = " ".join(w.text for w in words)
 

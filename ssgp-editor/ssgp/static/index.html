@@ -347,9 +347,10 @@ function fixbarHTML(){
     +'<span class="chip" onclick="fix.capOff()">Turn captions off</span>'
     +'<span class="chip" onclick="fix.cutLess()">Cut less (kept too little)</span>'
     +'<span class="chip" onclick="fix.cutOff()">Stop cutting</span>'
+    +'<span class="chip" onclick="fix.keepEnd()">Last word cut off → keep ending</span>'
     +'<span class="chip" onclick="fix.musicUp()">Music up</span>'
     +'<span class="chip" onclick="fix.musicDown()">Music down</span>'
-    +'</div><div style="display:flex;gap:8px"><input type="text" id="fixNote" placeholder="…or tell me what to fix in words"><button class="chip" style="border-color:var(--teal-dim);color:var(--text)" onclick="fix.note()">Redo</button></div></div>';
+    +'</div><div style="display:flex;gap:8px"><input type="text" id="fixNote" placeholder="Fix a word, e.g. change free to three  —  or describe any fix"><button class="chip" style="border-color:var(--teal-dim);color:var(--text)" onclick="fix.note()">Redo</button></div></div>';
 }
 function nudge(id,d,mn,mx){const e=$(id);e.value=Math.max(mn,Math.min(mx,(parseFloat(e.value)||0)+d));e.dispatchEvent(new Event('input'));}
 const fix={
@@ -358,10 +359,12 @@ const fix={
   capOff:()=>{$('t_captions').checked=false;submit();},
   cutLess:()=>{nudge('s_sil',-5,-50,-10);submit();},   /* more negative = fewer cuts */
   cutOff:()=>{$('t_cuts').checked=false;submit();},
+  keepEnd:()=>{appendInstr('keep the ending');submit();},
   musicUp:()=>{nudge('s_music',0.08,0,1);submit();},
   musicDown:()=>{nudge('s_music',-0.08,0,1);submit();},
-  note:()=>{const n=($('fixNote')?$('fixNote').value:'').trim();if(n){const ta=$('instructions');ta.value=(ta.value.trim()?ta.value.trim().replace(/[.,\s]*$/,'')+', ':'')+n;}submit();}
+  note:()=>{const n=($('fixNote')?$('fixNote').value:'').trim();if(n)appendInstr(n);submit();}
 };
+function appendInstr(t){const ta=$('instructions');ta.value=(ta.value.trim()?ta.value.trim().replace(/[.,\s]*$/,'')+', ':'')+t;}
 window.fix=fix;
 
 $('go').addEventListener('click',submit);
