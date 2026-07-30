@@ -115,6 +115,26 @@ def total_kept_duration(keeps: Sequence[Segment]) -> float:
     return sum(b - a for a, b in keeps)
 
 
+def cap_keeps(keeps: Sequence[Segment], max_total: float) -> List[Segment]:
+    """Cap the kept segments so their combined length is at most ``max_total``
+    seconds (trims the final segment). Used for a target/max output length."""
+    if not max_total or max_total <= 0:
+        return list(keeps)
+    out: List[Segment] = []
+    acc = 0.0
+    for a, b in keeps:
+        seg = b - a
+        if acc + seg <= max_total:
+            out.append((a, b))
+            acc += seg
+        else:
+            remain = max_total - acc
+            if remain > 0.05:
+                out.append((a, a + remain))
+            break
+    return out or list(keeps)[:1]
+
+
 def subtract_ranges(keeps: Sequence[Segment], removals: Sequence[Segment], min_segment: float = 0.2) -> List[Segment]:
     """Remove ``removals`` (e.g. AI-flagged flubs) from the kept segments."""
     result = list(keeps)

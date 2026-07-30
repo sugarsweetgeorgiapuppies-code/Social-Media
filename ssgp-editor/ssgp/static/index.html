@@ -5,77 +5,96 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>SSGP Editor</title>
 <style>
-  :root {
-    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a;
-    --text:#eef1f6; --muted:#9aa3b2; --accent:#ffd24a; --accent2:#7c9cff;
-    --ok:#37d67a; --err:#ff6b6b; --radius:14px;
+  :root{
+    --bg:#0e1621; --panel:#16212e; --panel2:#1c2836; --line:#26333f;
+    --text:#eaf1f7; --muted:#8ea3b4; --teal:#2ec5e6; --teal-dim:#1c93b0;
+    --yellow:#ffd23f; --ok:#37d67a; --err:#ff6b6b; --r:16px;
   }
-  * { box-sizing:border-box; }
-  body {
-    margin:0; background:var(--bg); color:var(--text);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    line-height:1.5;
-  }
-  header {
-    padding:22px 28px; border-bottom:1px solid var(--line);
-    display:flex; align-items:center; gap:12px;
-  }
-  header .logo { font-size:26px; }
-  header h1 { font-size:18px; margin:0; font-weight:800; letter-spacing:.2px; }
-  header .sub { color:var(--muted); font-size:13px; margin-left:auto; }
-  .wrap { max-width:1080px; margin:0 auto; padding:24px 20px 80px; }
-  .grid { display:grid; grid-template-columns:1fr 380px; gap:22px; align-items:start; }
-  @media (max-width:900px){ .grid{ grid-template-columns:1fr; } }
-  .card {
-    background:var(--panel); border:1px solid var(--line);
-    border-radius:var(--radius); padding:18px 18px;
-  }
-  .card h2 { font-size:14px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:0 0 14px; }
-  label { display:block; font-size:13px; color:var(--muted); margin:14px 0 6px; }
-  textarea, input[type=text], select {
-    width:100%; background:var(--panel2); color:var(--text);
-    border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:14px;
-  }
-  textarea { resize:vertical; min-height:64px; font-family:inherit; }
-  .file { display:flex; align-items:center; gap:10px; margin-top:8px; }
-  .file input[type=file]{ font-size:13px; color:var(--muted); }
-  .row { display:flex; gap:14px; flex-wrap:wrap; }
-  .toggles { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  .toggle {
-    display:flex; align-items:center; justify-content:space-between; gap:8px;
-    background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:9px 12px; font-size:14px;
-  }
-  .switch { position:relative; width:42px; height:24px; flex:0 0 auto; }
-  .switch input { opacity:0; width:0; height:0; }
-  .slider-sw { position:absolute; inset:0; background:#39404d; border-radius:999px; transition:.15s; }
-  .slider-sw:before { content:""; position:absolute; height:18px; width:18px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.15s; }
-  .switch input:checked + .slider-sw { background:var(--accent); }
-  .switch input:checked + .slider-sw:before { transform:translateX(18px); }
-  .range { margin:6px 0 2px; }
-  .range .val { float:right; color:var(--accent); font-variant-numeric:tabular-nums; }
-  input[type=range]{ width:100%; accent-color:var(--accent); }
-  button.primary {
-    width:100%; margin-top:18px; padding:14px; font-size:15px; font-weight:800;
-    background:var(--accent); color:#1a1a1a; border:none; border-radius:12px; cursor:pointer;
-  }
-  button.primary:disabled { opacity:.5; cursor:not-allowed; }
-  .status { margin-top:14px; }
-  .bar { height:10px; background:var(--panel2); border-radius:999px; overflow:hidden; border:1px solid var(--line); }
-  .bar > div { height:100%; width:0; background:linear-gradient(90deg,var(--accent2),var(--accent)); transition:width .3s; }
-  .stage { font-size:13px; color:var(--muted); margin-top:8px; }
-  .stage.err { color:var(--err); }
-  .stage.ok { color:var(--ok); }
-  video { width:100%; border-radius:12px; margin-top:12px; background:#000; max-height:70vh; }
-  .dl { display:inline-block; margin-top:10px; color:var(--accent); text-decoration:none; font-weight:700; font-size:14px; }
-  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
-  .chip { background:var(--panel2); border:1px solid var(--line); border-radius:999px; padding:3px 10px; font-size:12px; color:var(--muted); }
-  .hint { font-size:12px; color:var(--muted); margin-top:6px; }
-  .preview-empty { color:var(--muted); font-size:14px; text-align:center; padding:40px 10px; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.5}
+  a{color:var(--teal)}
+  header{display:flex;align-items:center;gap:12px;padding:16px 24px;border-bottom:1px solid var(--line);
+    position:sticky;top:0;background:rgba(14,22,33,.9);backdrop-filter:blur(8px);z-index:5}
+  header .mark{font-size:24px}
+  header h1{font-size:17px;margin:0;font-weight:800;letter-spacing:.2px}
+  header .sub{color:var(--muted);font-size:12px;margin-left:auto}
+  .wrap{max-width:1120px;margin:0 auto;padding:22px 18px 90px}
+  .grid{display:grid;grid-template-columns:1fr 400px;gap:20px;align-items:start}
+  @media(max-width:920px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px;margin-bottom:16px}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:0 0 4px;font-weight:700}
+  .card .step{color:var(--teal)}
+  .card p.help{color:var(--muted);font-size:12.5px;margin:4px 0 14px}
+  label.fld{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
+  textarea,input[type=text],input[type=number],select{width:100%;background:var(--panel2);color:var(--text);
+    border:1px solid var(--line);border-radius:10px;padding:11px 12px;font-size:14px;font-family:inherit}
+  textarea{resize:vertical}
+  textarea:focus,input:focus,select:focus{outline:none;border-color:var(--teal-dim)}
+  /* file drop */
+  .drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+    border:2px dashed var(--line);border-radius:12px;padding:22px;text-align:center;cursor:pointer;transition:.15s}
+  .drop:hover{border-color:var(--teal-dim);background:var(--panel2)}
+  .drop .big{font-size:15px;font-weight:700}
+  .drop .sm{color:var(--muted);font-size:12px}
+  .drop.has{border-style:solid;border-color:var(--teal-dim)}
+  input[type=file]{display:none}
+  /* chips */
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+  .chip{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:12px;
+    color:var(--muted);cursor:pointer;transition:.12s}
+  .chip:hover{color:var(--text);border-color:var(--teal-dim)}
+  .chip.static{cursor:default}
+  /* segmented (length) */
+  .seg{display:inline-flex;background:var(--panel2);border:1px solid var(--line);border-radius:10px;overflow:hidden;flex-wrap:wrap}
+  .seg button{background:none;border:none;color:var(--muted);padding:9px 15px;font-size:13px;font-weight:600;cursor:pointer}
+  .seg button.on{background:var(--teal);color:#08222b}
+  /* toggles */
+  .tgl-grp{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media(max-width:560px){.tgl-grp{grid-template-columns:1fr}}
+  .tgl{display:flex;align-items:center;gap:11px;background:var(--panel2);border:1px solid var(--line);
+    border-radius:11px;padding:11px 13px}
+  .tgl .txt{flex:1;min-width:0}
+  .tgl .txt b{display:block;font-size:13.5px;font-weight:600}
+  .tgl .txt span{display:block;color:var(--muted);font-size:11px;line-height:1.35}
+  .sw{position:relative;width:40px;height:23px;flex:0 0 auto}
+  .sw input{opacity:0;width:0;height:0}
+  .sl{position:absolute;inset:0;background:#3a4757;border-radius:999px;transition:.15s}
+  .sl:before{content:"";position:absolute;height:17px;width:17px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.15s}
+  .sw input:checked + .sl{background:var(--teal)}
+  .sw input:checked + .sl:before{transform:translateX(17px)}
+  .grp-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:16px 0 8px;font-weight:700}
+  /* advanced */
+  details.adv{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);margin-bottom:16px}
+  details.adv>summary{cursor:pointer;padding:15px 18px;font-size:13px;font-weight:700;color:var(--text);list-style:none}
+  details.adv>summary::-webkit-details-marker{display:none}
+  details.adv>summary::after{content:"▸";float:right;color:var(--muted)}
+  details.adv[open]>summary::after{content:"▾"}
+  .adv-body{padding:0 18px 18px}
+  .rng{margin:12px 0}
+  .rng .val{float:right;color:var(--teal);font-variant-numeric:tabular-nums;font-weight:600}
+  input[type=range]{width:100%;accent-color:var(--teal)}
+  .row2{display:flex;gap:12px;flex-wrap:wrap}
+  .row2>div{flex:1;min-width:150px}
+  /* render */
+  .render{width:100%;padding:15px;font-size:16px;font-weight:800;background:var(--yellow);color:#12263a;
+    border:none;border-radius:13px;cursor:pointer}
+  .render:disabled{opacity:.5;cursor:not-allowed}
+  /* result */
+  .result{position:sticky;top:76px}
+  .bar{height:9px;background:var(--panel2);border-radius:999px;overflow:hidden;border:1px solid var(--line)}
+  .bar>div{height:100%;width:0;background:linear-gradient(90deg,var(--teal),var(--yellow));transition:width .3s}
+  .stage{font-size:13px;color:var(--muted);margin-top:9px}
+  .stage.err{color:var(--err)} .stage.ok{color:var(--ok)}
+  video{width:100%;border-radius:12px;margin-top:12px;background:#000;max-height:66vh}
+  .dl{display:inline-block;margin-top:10px;color:var(--yellow);text-decoration:none;font-weight:700;font-size:14px}
+  .empty{color:var(--muted);font-size:13px;text-align:center;padding:38px 10px}
+  details.tr summary{cursor:pointer;color:var(--muted);font-size:12px}
 </style>
 </head>
 <body>
 <header>
-  <span class="logo">🐶</span>
+  <span class="mark">🐶</span>
   <h1>SSGP Editor</h1>
   <span class="sub">raw clip → finished vertical Reel</span>
 </header>
@@ -83,259 +102,240 @@
 <div class="wrap">
 <div class="grid">
 
-  <!-- LEFT: inputs + controls -->
+  <!-- ============ LEFT: controls ============ -->
   <div>
+
+    <!-- 1. SOURCE -->
     <div class="card">
-      <h2>Source</h2>
-      <label>Video URL(s) — one per line (Google Drive links work)</label>
-      <textarea id="urls" placeholder="https://drive.google.com/uc?export=download&id=FILEID"></textarea>
-      <div class="file">
-        <input type="file" id="files" accept="video/*" multiple />
-      </div>
-      <div class="hint">Paste one or more URLs, and/or pick file(s). Multiple clips are stitched into one Reel, in order.</div>
-
-      <label>What should I do? (optional, plain English)</label>
-      <textarea id="instructions" placeholder="e.g. stitch these two, tight cuts, no music, all-caps captions, add the end card"></textarea>
+      <h2><span class="step">1</span> · Your clip</h2>
+      <label class="drop" id="drop" for="files">
+        <span class="big" id="dropTitle">Choose video(s)</span>
+        <span class="sm">click to pick, or drag files here</span>
+      </label>
+      <input type="file" id="files" accept="video/*" multiple />
+      <label class="fld">…or paste a link (Google Drive works)</label>
+      <textarea id="urls" rows="2" placeholder="https://drive.google.com/uc?export=download&id=FILEID"></textarea>
+      <p class="help">Add one clip, or several. To get one finished Reel per clip, turn on <b>Separate Reels</b> below; leave it off to stitch them into one.</p>
     </div>
 
-    <div class="card" style="margin-top:18px;">
+    <!-- 2. INSTRUCTIONS -->
+    <div class="card">
+      <h2><span class="step">2</span> · What should I do? <span style="text-transform:none;letter-spacing:0;color:var(--muted);font-weight:400">(optional)</span></h2>
+      <p class="help">Plain English — I'll set everything up for you. This overrides the switches below.</p>
+      <textarea id="instructions" rows="3" placeholder="e.g. cut the parts without dogs, take the audio out and put music over it, add captions, keep it under 30 seconds"></textarea>
+      <div class="chips" id="exchips">
+        <span class="chip" data-t="tight cuts">tight cuts</span>
+        <span class="chip" data-t="no music">no music</span>
+        <span class="chip" data-t="music only">music only</span>
+        <span class="chip" data-t="cut to dogs only">cut to dogs only</span>
+        <span class="chip" data-t="all-caps captions">all-caps captions</span>
+        <span class="chip" data-t="add the end card">end card</span>
+        <span class="chip" data-t="keep it under 30 seconds">under 30s</span>
+      </div>
+    </div>
+
+    <!-- 3. LENGTH -->
+    <div class="card">
+      <h2><span class="step">3</span> · Length</h2>
+      <p class="help">Cap how long the finished Reel can be. Auto keeps whatever's left after cutting.</p>
+      <div class="seg" id="lenSeg">
+        <button data-sec="" class="on">Auto</button>
+        <button data-sec="15">15s</button>
+        <button data-sec="30">30s</button>
+        <button data-sec="60">60s</button>
+        <button data-sec="custom">Custom</button>
+      </div>
+      <div id="lenCustomWrap" style="display:none;margin-top:10px">
+        <input type="number" id="lenCustom" min="3" max="600" step="1" placeholder="seconds" style="max-width:160px">
+      </div>
+    </div>
+
+    <!-- 4. FEATURES -->
+    <div class="card">
       <h2>Features</h2>
-      <div class="toggles" id="toggles">
-        <div class="toggle">Auto cuts <label class="switch"><input type="checkbox" id="t_cuts" checked><span class="slider-sw"></span></label></div>
-        <div class="toggle">Captions <label class="switch"><input type="checkbox" id="t_captions" checked><span class="slider-sw"></span></label></div>
-        <div class="toggle">Auto zoom <label class="switch"><input type="checkbox" id="t_zoom" checked><span class="slider-sw"></span></label></div>
-        <div class="toggle">Music <label class="switch"><input type="checkbox" id="t_music" checked><span class="slider-sw"></span></label></div>
-        <div class="toggle">Watermark <label class="switch"><input type="checkbox" id="t_watermark" checked><span class="slider-sw"></span></label></div>
-        <div class="toggle">CTA end card <label class="switch"><input type="checkbox" id="t_cta"><span class="slider-sw"></span></label></div>
-        <div class="toggle" title="Uses AI to cut spoken mistakes, false starts, and off-topic bits (needs an Anthropic API key)">Smart cut ✨ <label class="switch"><input type="checkbox" id="t_smart"><span class="slider-sw"></span></label></div>
-        <div class="toggle" title="Keep only the parts where a dog/puppy is on screen (needs: pip install ultralytics)">Cut to dogs 🐶 <label class="switch"><input type="checkbox" id="t_dogcut"><span class="slider-sw"></span></label></div>
-        <div class="toggle" title="Remove the voice and play only music over the video (captions still generated)">Music only 🎵 <label class="switch"><input type="checkbox" id="t_musiconly"><span class="slider-sw"></span></label></div>
-        <div class="toggle" title="Make one finished Reel per clip instead of stitching them into one">Separate Reels <label class="switch"><input type="checkbox" id="t_separate"><span class="slider-sw"></span></label></div>
+      <div class="grp-label">Basics</div>
+      <div class="tgl-grp">
+        <label class="tgl"><span class="txt"><b>Captions</b><span>animated word-by-word</span></span><span class="sw"><input type="checkbox" id="t_captions" checked><span class="sl"></span></span></label>
+        <label class="tgl"><span class="txt"><b>Auto cuts</b><span>trim dead air</span></span><span class="sw"><input type="checkbox" id="t_cuts" checked><span class="sl"></span></span></label>
+        <label class="tgl"><span class="txt"><b>Auto zoom</b><span>subtle motion</span></span><span class="sw"><input type="checkbox" id="t_zoom" checked><span class="sl"></span></span></label>
+        <label class="tgl"><span class="txt"><b>Music</b><span>background bed</span></span><span class="sw"><input type="checkbox" id="t_music" checked><span class="sl"></span></span></label>
+        <label class="tgl"><span class="txt"><b>Watermark</b><span>logo in the corner</span></span><span class="sw"><input type="checkbox" id="t_watermark" checked><span class="sl"></span></span></label>
+        <label class="tgl"><span class="txt"><b>End card</b><span>outro w/ phone #</span></span><span class="sw"><input type="checkbox" id="t_cta"><span class="sl"></span></span></label>
       </div>
-      <div class="hint">Turn on <b>Separate Reels</b> to upload many clips and get one finished Reel back per clip. Leave it off to stitch clips into a single Reel.</div>
+      <div class="grp-label">Smart</div>
+      <div class="tgl-grp">
+        <label class="tgl"><span class="txt"><b>Smart cut ✨</b><span>AI removes mistakes</span></span><span class="sw"><input type="checkbox" id="t_smart"><span class="sl"></span></span></label>
+        <label class="tgl"><span class="txt"><b>Cut to dogs 🐶</b><span>keep only puppy shots</span></span><span class="sw"><input type="checkbox" id="t_dogcut"><span class="sl"></span></span></label>
+        <label class="tgl"><span class="txt"><b>Music only 🎵</b><span>remove the voice</span></span><span class="sw"><input type="checkbox" id="t_musiconly"><span class="sl"></span></span></label>
+        <label class="tgl"><span class="txt"><b>Separate Reels</b><span>one per clip</span></span><span class="sw"><input type="checkbox" id="t_separate"><span class="sl"></span></span></label>
+      </div>
     </div>
 
-    <div class="card" style="margin-top:18px;">
-      <h2>Settings</h2>
-      <div class="range">
-        <span class="val" id="v_music">0.18</span><label style="margin:0">Music volume</label>
-        <input type="range" id="s_music" min="0" max="1" step="0.01" value="0.18">
-      </div>
-      <div class="range">
-        <span class="val" id="v_zoom">0.06</span><label style="margin:0">Zoom intensity</label>
-        <input type="range" id="s_zoom" min="0" max="0.2" step="0.005" value="0.06">
-      </div>
-      <div class="range">
-        <span class="val" id="v_sil">-30 dB</span><label style="margin:0">Silence threshold</label>
-        <input type="range" id="s_sil" min="-50" max="-10" step="1" value="-30">
-      </div>
-      <div class="range">
-        <span class="val" id="v_captime">0.00s</span><label style="margin:0">Caption timing (− earlier · + later)</label>
-        <input type="range" id="s_captime" min="-1.5" max="1.5" step="0.05" value="0">
-      </div>
-      <div class="row">
-        <div style="flex:1; min-width:150px;">
-          <label>Caption model</label>
-          <select id="model">
-            <option value="tiny">tiny (fastest)</option>
-            <option value="base" selected>base</option>
-            <option value="small">small</option>
-            <option value="medium">medium (accurate)</option>
-          </select>
-        </div>
-        <div style="flex:1; min-width:150px;">
-          <label>Music track</label>
-          <select id="track"><option value="">— random —</option></select>
+    <!-- ADVANCED -->
+    <details class="adv">
+      <summary>Advanced settings</summary>
+      <div class="adv-body">
+        <div class="rng"><span class="val" id="v_music">0.18</span><label class="fld" style="margin:0">Music volume</label><input type="range" id="s_music" min="0" max="1" step="0.01" value="0.18"></div>
+        <div class="rng"><span class="val" id="v_zoom">0.05</span><label class="fld" style="margin:0">Zoom intensity</label><input type="range" id="s_zoom" min="0" max="0.2" step="0.005" value="0.05"></div>
+        <div class="rng"><span class="val" id="v_sil">-30 dB</span><label class="fld" style="margin:0">Silence threshold (higher = cut more)</label><input type="range" id="s_sil" min="-50" max="-10" step="1" value="-30"></div>
+        <div class="rng"><span class="val" id="v_captime">0.00s</span><label class="fld" style="margin:0">Caption timing (− earlier · + later)</label><input type="range" id="s_captime" min="-1.5" max="1.5" step="0.05" value="0"></div>
+        <div class="row2">
+          <div><label class="fld">Caption accuracy</label>
+            <select id="model"><option value="tiny">Fastest</option><option value="base">Fast</option><option value="small" selected>Balanced</option><option value="medium">Most accurate</option></select></div>
+          <div><label class="fld">Music track</label><select id="track"><option value="">— random —</option></select></div>
         </div>
       </div>
-      <button class="primary" id="go">Render Reel</button>
-    </div>
+    </details>
+
+    <button class="render" id="go">Render Reel</button>
   </div>
 
-  <!-- RIGHT: status + preview -->
-  <div class="card" style="position:sticky; top:20px;">
+  <!-- ============ RIGHT: result ============ -->
+  <div class="card result">
     <h2>Result</h2>
-    <div class="status">
-      <div class="bar"><div id="prog"></div></div>
-      <div class="stage" id="stage">Idle — submit a clip to start.</div>
-      <div class="chips" id="notes"></div>
-    </div>
-    <div id="preview"><div class="preview-empty">Your finished Reel will appear here.</div></div>
+    <div class="bar"><div id="prog"></div></div>
+    <div class="stage" id="stage">Idle — add a clip and hit Render.</div>
+    <div class="chips" id="notes" style="margin-top:8px"></div>
+    <div id="preview"><div class="empty">Your finished Reel will appear here.</div></div>
   </div>
 
 </div>
 </div>
 
 <script>
-const $ = (id) => document.getElementById(id);
-const bind = (slider, out, fmt) => {
-  const el = $(slider), o = $(out);
-  const upd = () => o.textContent = fmt ? fmt(el.value) : el.value;
-  el.addEventListener('input', upd); upd();
-};
+const $=id=>document.getElementById(id);
+
+/* sliders */
+const bind=(s,o,f)=>{const e=$(s),ou=$(o);const u=()=>ou.textContent=f?f(e.value):e.value;e.addEventListener('input',u);u();};
 bind('s_music','v_music');
 bind('s_zoom','v_zoom');
-bind('s_sil','v_sil', v => v + ' dB');
-bind('s_captime','v_captime', v => (v>0?'+':'') + parseFloat(v).toFixed(2) + 's');
+bind('s_sil','v_sil',v=>v+' dB');
+bind('s_captime','v_captime',v=>(v>0?'+':'')+parseFloat(v).toFixed(2)+'s');
 
-// load music tracks + config defaults
+/* file drop label */
+const drop=$('drop'),files=$('files');
+files.addEventListener('change',()=>{
+  const n=files.files.length;
+  $('dropTitle').textContent = n? (n+' file'+(n>1?'s':'')+' selected') : 'Choose video(s)';
+  drop.classList.toggle('has', n>0);
+});
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('has')}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();}));
+drop.addEventListener('drop',e=>{if(e.dataTransfer.files.length){files.files=e.dataTransfer.files;files.dispatchEvent(new Event('change'));}});
+
+/* example chips -> append to instructions */
+document.querySelectorAll('#exchips .chip').forEach(c=>c.addEventListener('click',()=>{
+  const ta=$('instructions');const cur=ta.value.trim();
+  ta.value=(cur? cur.replace(/[.,\s]*$/,'')+', ':'')+c.dataset.t;
+  ta.focus();
+}));
+
+/* length segmented */
+let maxDuration=null;
+$('lenSeg').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  [...$('lenSeg').children].forEach(x=>x.classList.remove('on')); b.classList.add('on');
+  const v=b.dataset.sec;
+  if(v==='custom'){ $('lenCustomWrap').style.display='block'; maxDuration=parseFloat($('lenCustom').value)||null; }
+  else { $('lenCustomWrap').style.display='none'; maxDuration=v?parseFloat(v):null; }
+});
+$('lenCustom').addEventListener('input',()=>{ maxDuration=parseFloat($('lenCustom').value)||null; });
+
+/* populate music + config defaults */
 fetch('/api/music').then(r=>r.json()).then(d=>{
-  const sel = $('track');
-  (d.tracks||[]).forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=t; sel.appendChild(o); });
+  (d.tracks||[]).forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;$('track').appendChild(o);});
 }).catch(()=>{});
-fetch('/api/config').then(r=>r.json()).then(c=>{
-  try {
-    $('s_music').value = c.music.volume; $('s_music').dispatchEvent(new Event('input'));
-    $('s_zoom').value = c.zoom.intensity; $('s_zoom').dispatchEvent(new Event('input'));
-    $('s_sil').value = c.cuts.silence_threshold_db; $('s_sil').dispatchEvent(new Event('input'));
-    $('model').value = c.captions.model || 'base';
-    $('t_cta').checked = !!c.cta.enabled;
-    $('t_smart').checked = !!(c.cuts && c.cuts.smart_cut);
-  } catch(e){}
-}).catch(()=>{});
+fetch('/api/config').then(r=>r.json()).then(c=>{try{
+  $('s_music').value=c.music.volume;$('s_music').dispatchEvent(new Event('input'));
+  $('s_zoom').value=c.zoom.intensity;$('s_zoom').dispatchEvent(new Event('input'));
+  $('s_sil').value=c.cuts.silence_threshold_db;$('s_sil').dispatchEvent(new Event('input'));
+  $('model').value=c.captions.model||'small';
+  $('t_cta').checked=!!c.cta.enabled; $('t_smart').checked=!!(c.cuts&&c.cuts.smart_cut);
+}catch(e){}}).catch(()=>{});
 
 function collectOptions(){
   return {
-    cuts: $('t_cuts').checked,
-    smart_cut: $('t_smart').checked,
-    dog_cut: $('t_dogcut').checked,
-    captions: { enabled: $('t_captions').checked, model: $('model').value, time_offset: parseFloat($('s_captime').value) },
-    zoom: { enabled: $('t_zoom').checked, intensity: parseFloat($('s_zoom').value) },
-    music: { enabled: $('t_music').checked, volume: parseFloat($('s_music').value), track: $('track').value || null, replace_voice: $('t_musiconly').checked },
-    watermark: $('t_watermark').checked,
-    cta: $('t_cta').checked,
-    silence_threshold_db: parseInt($('s_sil').value,10),
+    cuts:$('t_cuts').checked,
+    smart_cut:$('t_smart').checked,
+    dog_cut:$('t_dogcut').checked,
+    captions:{enabled:$('t_captions').checked,model:$('model').value,time_offset:parseFloat($('s_captime').value)},
+    zoom:{enabled:$('t_zoom').checked,intensity:parseFloat($('s_zoom').value)},
+    music:{enabled:$('t_music').checked,volume:parseFloat($('s_music').value),track:$('track').value||null,replace_voice:$('t_musiconly').checked},
+    watermark:$('t_watermark').checked,
+    cta:$('t_cta').checked,
+    silence_threshold_db:parseInt($('s_sil').value,10),
+    max_duration:maxDuration
   };
 }
 
-let poll = null;
-function setStage(msg, cls){ const s=$('stage'); s.textContent=msg; s.className='stage'+(cls?(' '+cls):''); }
+let poll=null;
+const setStage=(m,c)=>{const s=$('stage');s.textContent=m;s.className='stage'+(c?' '+c:'');};
 
 async function submit(){
-  const urls = $('urls').value.split('\n').map(s=>s.trim()).filter(Boolean);
-  const files = $('files').files;
-  if(!urls.length && !files.length){ setStage('Add a URL or choose a file first.', 'err'); return; }
-
-  $('go').disabled = true;
-  $('preview').innerHTML = '<div class="preview-empty">Rendering…</div>';
-  $('notes').innerHTML = '';
-  $('prog').style.width = '0%';
+  const urls=$('urls').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  if(!urls.length && !files.files.length){setStage('Add a video or a link first.','err');return;}
+  $('go').disabled=true;$('preview').innerHTML='<div class="empty">Rendering…</div>';$('notes').innerHTML='';$('prog').style.width='0%';
   setStage('Submitting…');
-
-  const options = collectOptions();
-  const instructions = $('instructions').value.trim();
-  const separate = $('t_separate').checked;
-
+  const options=collectOptions();const instructions=$('instructions').value.trim();const separate=$('t_separate').checked;
   let resp;
-  if(files.length){
-    const fd = new FormData();
-    for(const f of files) fd.append('files', f);
-    urls.forEach(u => fd.append('video_url', u));
-    fd.append('options', JSON.stringify(options));
-    if(separate) fd.append('separate', 'true');
-    if(instructions) fd.append('instructions', instructions);
-    resp = await fetch('/render', { method:'POST', body: fd });
-  } else {
-    resp = await fetch('/render', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ video_urls: urls, options, instructions, separate })
-    });
+  if(files.files.length){
+    const fd=new FormData();
+    for(const f of files.files) fd.append('files',f);
+    urls.forEach(u=>fd.append('video_url',u));
+    fd.append('options',JSON.stringify(options));
+    if(separate) fd.append('separate','true');
+    if(instructions) fd.append('instructions',instructions);
+    resp=await fetch('/render',{method:'POST',body:fd});
+  }else{
+    resp=await fetch('/render',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({video_urls:urls,options,instructions,separate})});
   }
-
-  if(!resp.ok){ setStage('Error: '+(await resp.text()), 'err'); $('go').disabled=false; return; }
-  const data = await resp.json();
-  if(poll) clearInterval(poll);
-  if(data.ids){                       // batch mode — many Reels
-    setStage('Queued '+data.ids.length+' Reels…');
-    buildGallery(data.ids);
-    poll = setInterval(()=>checkBatch(data.ids), 1500);
-  } else {
-    setStage('Queued… (job '+data.id+')');
-    poll = setInterval(()=>checkStatus(data.id), 1200);
-  }
-}
-
-function buildGallery(ids){
-  $('preview').innerHTML = '<div id="gallery" style="display:grid;grid-template-columns:1fr 1fr;gap:10px"></div>';
-  const g = $('gallery');
-  ids.forEach((id,i)=>{
-    const cell = document.createElement('div');
-    cell.id = 'cell_'+id;
-    cell.innerHTML = '<div class="bar"><div class="pg" style="height:100%;width:0;background:linear-gradient(90deg,var(--accent2),var(--accent))"></div></div><div class="stage" style="font-size:12px">Reel '+(i+1)+'…</div>';
-    g.appendChild(cell);
-  });
-}
-
-async function checkBatch(ids){
-  let done = 0;
-  for(let i=0;i<ids.length;i++){
-    const id = ids[i];
-    const r = await fetch('/render/'+id); if(!r.ok) continue;
-    const j = await r.json();
-    const cell = $('cell_'+id); if(!cell) continue;
-    const bar = cell.querySelector('.pg'), st = cell.querySelector('.stage');
-    if(bar) bar.style.width = (j.progress||0)+'%';
-    if(j.status==='succeeded'){
-      done++;
-      cell.innerHTML = '<video src="'+j.url+'" controls muted playsinline style="margin:0"></video>'+
-        '<a class="dl" href="'+j.url+'" download>⬇ Reel '+(i+1)+'</a>';
-    } else if(j.status==='failed'){
-      done++;
-      if(st){ st.textContent='Reel '+(i+1)+' failed'; st.className='stage err'; }
-    } else if(st){ st.textContent = 'Reel '+(i+1)+': '+(j.stage||j.status); }
-  }
-  if(done>=ids.length){ clearInterval(poll); $('go').disabled=false; setStage('Done ✓ '+ids.length+' Reels', 'ok'); }
+  if(!resp.ok){setStage('Error: '+(await resp.text()),'err');$('go').disabled=false;return;}
+  const data=await resp.json();
+  if(poll)clearInterval(poll);
+  if(data.ids){setStage('Queued '+data.ids.length+' Reels…');buildGallery(data.ids);poll=setInterval(()=>checkBatch(data.ids),1500);}
+  else{setStage('Queued…');poll=setInterval(()=>checkStatus(data.id),1200);}
 }
 
 async function checkStatus(id){
-  const r = await fetch('/render/'+id);
-  if(!r.ok) return;
-  const j = await r.json();
-  $('prog').style.width = (j.progress||0) + '%';
-  if(j.notes && j.notes.length){
-    $('notes').innerHTML = j.notes.map(n=>'<span class="chip">'+n+'</span>').join('');
-  }
+  const r=await fetch('/render/'+id);if(!r.ok)return;const j=await r.json();
+  $('prog').style.width=(j.progress||0)+'%';
+  if(j.notes&&j.notes.length)$('notes').innerHTML=j.notes.map(n=>'<span class="chip static">'+n+'</span>').join('');
   if(j.status==='succeeded'){
-    clearInterval(poll); $('go').disabled=false;
-    setStage('Done ✓  '+(j.applied&&j.applied.output_duration?('· '+j.applied.output_duration+'s'):''), 'ok');
-    const applied = j.applied||{};
-    const chips = Object.entries(applied).filter(([k])=>['captions','music','zoom','watermark','cta','segments_kept','words'].includes(k))
-      .map(([k,v])=>'<span class="chip">'+k+': '+v+'</span>').join('');
-    // smart-cut report
-    let sc = '';
-    if(applied.smart_cut){
-      const s = applied.smart_cut;
-      const cls = s.status==='ok' ? 'ok' : (s.status==='error' ? 'err' : '');
-      sc = '<div class="stage '+cls+'" style="margin-top:10px">✂️ Smart cut: '+(s.detail||s.status)+'</div>';
-      if(s.reasons && s.reasons.length) sc += '<div class="chips">'+s.reasons.map(r=>'<span class="chip">cut: '+r+'</span>').join('')+'</div>';
-    }
-    // dog-only cut report
-    if(applied.dog_cut){
-      const d=applied.dog_cut; const cls=d.status==='ok'?'ok':(d.status==='error'?'err':'');
-      sc+='<div class="stage '+cls+'" style="margin-top:8px">🐶 Dog cut: '+(d.detail||d.status)+'</div>';
-    }
-    // breed-name corrections applied
-    if(applied.corrections && applied.corrections.length){
-      sc += '<div class="stage ok" style="margin-top:8px">🐶 Fixed breed names</div><div class="chips">'+
-        applied.corrections.map(c=>'<span class="chip">'+c+'</span>').join('')+'</div>';
-    }
-    // transcript (so you can see what it heard)
-    let tr = '';
-    if(applied.transcript) tr = '<details style="margin-top:10px"><summary class="hint">What it heard (transcript)</summary><div class="hint" style="margin-top:6px">'+applied.transcript+'</div></details>';
-    $('preview').innerHTML =
-      '<video src="'+j.url+'" controls autoplay muted playsinline></video>'+
-      '<div class="chips" style="margin-top:10px">'+chips+'</div>'+ sc + tr +
-      '<a class="dl" href="'+j.url+'" download>⬇ Download MP4</a>';
-  } else if(j.status==='failed'){
-    clearInterval(poll); $('go').disabled=false;
-    setStage('Failed: '+(j.error||'unknown error'), 'err');
-    $('preview').innerHTML = '<div class="preview-empty">Render failed.</div>';
-  } else {
-    setStage((j.stage||j.status)+'…');
-  }
+    clearInterval(poll);$('go').disabled=false;
+    const a=j.applied||{};
+    setStage('Done ✓'+(a.output_duration?'  ·  '+a.output_duration+'s':''),'ok');
+    const chips=Object.entries(a).filter(([k])=>['captions','music','zoom','watermark','cta','segments_kept','words','capped_to'].includes(k))
+      .map(([k,v])=>'<span class="chip static">'+k+': '+v+'</span>').join('');
+    let sc='';
+    if(a.smart_cut){const s=a.smart_cut;sc+='<div class="stage '+(s.status==='ok'?'ok':(s.status==='error'?'err':''))+'" style="margin-top:10px">✂️ Smart cut: '+(s.detail||s.status)+'</div>';}
+    if(a.dog_cut){const d=a.dog_cut;sc+='<div class="stage '+(d.status==='ok'?'ok':(d.status==='error'?'err':''))+'" style="margin-top:8px">🐶 Dog cut: '+(d.detail||d.status)+'</div>';}
+    if(a.corrections&&a.corrections.length)sc+='<div class="stage ok" style="margin-top:8px">🐶 Fixed breed names</div><div class="chips">'+a.corrections.map(c=>'<span class="chip static">'+c+'</span>').join('')+'</div>';
+    let tr='';if(a.transcript)tr='<details class="tr" style="margin-top:10px"><summary>What it heard</summary><div class="stage" style="margin-top:6px">'+a.transcript+'</div></details>';
+    $('preview').innerHTML='<video src="'+j.url+'" controls autoplay muted playsinline></video><div class="chips" style="margin-top:10px">'+chips+'</div>'+sc+tr+'<a class="dl" href="'+j.url+'" download>⬇ Download MP4</a>';
+  }else if(j.status==='failed'){clearInterval(poll);$('go').disabled=false;setStage('Failed: '+(j.error||'error'),'err');$('preview').innerHTML='<div class="empty">Render failed.</div>';}
+  else setStage((j.stage||j.status)+'…');
 }
 
-$('go').addEventListener('click', submit);
+function buildGallery(ids){
+  $('preview').innerHTML='<div id="gallery" style="display:grid;grid-template-columns:1fr 1fr;gap:10px"></div>';
+  ids.forEach((id,i)=>{const c=document.createElement('div');c.id='cell_'+id;
+    c.innerHTML='<div class="bar"><div class="pg" style="height:100%;width:0;background:linear-gradient(90deg,var(--teal),var(--yellow))"></div></div><div class="stage" style="font-size:12px">Reel '+(i+1)+'…</div>';
+    $('gallery').appendChild(c);});
+}
+async function checkBatch(ids){
+  let done=0;
+  for(let i=0;i<ids.length;i++){const id=ids[i];const r=await fetch('/render/'+id);if(!r.ok)continue;const j=await r.json();
+    const cell=$('cell_'+id);if(!cell)continue;const bar=cell.querySelector('.pg'),st=cell.querySelector('.stage');
+    if(bar)bar.style.width=(j.progress||0)+'%';
+    if(j.status==='succeeded'){done++;cell.innerHTML='<video src="'+j.url+'" controls muted playsinline style="margin:0"></video><a class="dl" href="'+j.url+'" download>⬇ Reel '+(i+1)+'</a>';}
+    else if(j.status==='failed'){done++;if(st){st.textContent='Reel '+(i+1)+' failed';st.className='stage err';}}
+    else if(st)st.textContent='Reel '+(i+1)+': '+(j.stage||j.status);
+  }
+  if(done>=ids.length){clearInterval(poll);$('go').disabled=false;setStage('Done ✓ '+ids.length+' Reels','ok');}
+}
+
+$('go').addEventListener('click',submit);
 </script>
 </body>
 </html>

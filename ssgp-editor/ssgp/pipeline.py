@@ -186,6 +186,12 @@ def render_video(
         applied["dog_cut"] = {"status": dc.get("status"), "detail": dc.get("detail"),
                               "removed": [[round(s, 2), round(e, 2)] for s, e in dremovals]}
 
+    # optional target/max length cap
+    max_dur = cfg["output"].get("max_duration")
+    if max_dur and silence_mod.total_kept_duration(keeps) > float(max_dur):
+        keeps = silence_mod.cap_keeps(keeps, float(max_dur))
+        applied["capped_to"] = float(max_dur)
+
     applied["segments_kept"] = len(keeps)
 
     cut_duration = silence_mod.total_kept_duration(keeps)

@@ -19,6 +19,7 @@ output:
   preset: medium       # x264 speed/size tradeoff (ultrafast..veryslow)
   audio_bitrate: 192k
   faststart: true      # move moov atom to front so it streams/plays instantly
+  max_duration: null   # cap the finished length in seconds (null = no cap / keep whatever's left)
 
 # ---------------------------------------------------------------------------
 # 1) AUTO CUTS — remove dead air / long silences so the clip stays tight.

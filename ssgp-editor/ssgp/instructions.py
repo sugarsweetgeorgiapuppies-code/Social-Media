@@ -37,6 +37,8 @@ Options you may set (include ONLY what the request asks for; omit the rest):
   from what was said.)
 - watermark.enabled (bool).
 - cta.enabled (bool): the end card.
+- output.max_duration (number, seconds): cap the finished length. e.g. "make it
+  30 seconds" -> 30, "under a minute" -> 60, "keep it to 15s" -> 15.
 """
 
 
@@ -135,12 +137,32 @@ def _interpret_rules(t: str) -> Tuple[Dict, List[str]]:
     if _has(t, "cta", "end card", "call to action", "outro", "add the card", "closing card"):
         set_("cta", "enabled", True, "CTA end card on")
 
+    # target / max length
+    secs = _parse_length(t)
+    if secs:
+        set_("output", "max_duration", secs, f"max length {secs}s")
+
     # language
     for lang, code in {"spanish": "es", "french": "fr", "german": "de", "portuguese": "pt"}.items():
         if _has(t, lang):
             set_("captions", "language", code, f"language: {code}")
 
     return o, notes
+
+
+def _parse_length(t: str) -> float | None:
+    """Pull a target length in seconds out of the text, if any."""
+    if _has(t, "under a minute", "less than a minute", "below a minute"):
+        return 60.0
+    if _has(t, "half a minute"):
+        return 30.0
+    m = re.search(r"(\d+(?:\.\d+)?)\s*(seconds|second|secs|sec|s)\b", t)
+    if m:
+        return float(m.group(1))
+    m = re.search(r"(\d+(?:\.\d+)?)\s*(minutes|minute|mins|min|m)\b", t)
+    if m:
+        return float(m.group(1)) * 60.0
+    return None
 
 
 def _interpret_llm(text: str) -> Tuple[Dict, List[str]]:

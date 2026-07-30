@@ -63,6 +63,7 @@ _FLAT_MAP = {
     "smart_cut": ("cuts", "smart_cut"),
     "dog_cut": ("cuts", "dog_cut"),
     "replace_voice": ("music", "replace_voice"),
+    "max_duration": ("output", "max_duration"),
     "captions": ("captions", "enabled"),
     "zoom": ("zoom", "enabled"),
     "music": ("music", "enabled"),
