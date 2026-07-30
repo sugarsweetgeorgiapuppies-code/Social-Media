@@ -313,7 +313,8 @@ async function checkStatus(id){
     let sc='';
     if(a.smart_cut){const s=a.smart_cut;sc+='<div class="stage '+(s.status==='ok'?'ok':(s.status==='error'?'err':''))+'" style="margin-top:10px">✂️ Smart cut: '+(s.detail||s.status)+'</div>';}
     if(a.dog_cut){const d=a.dog_cut;sc+='<div class="stage '+(d.status==='ok'?'ok':(d.status==='error'?'err':''))+'" style="margin-top:8px">🐶 Dog cut: '+(d.detail||d.status)+'</div>';}
-    if(a.corrections&&a.corrections.length)sc+='<div class="stage ok" style="margin-top:8px">🐶 Fixed breed names</div><div class="chips">'+a.corrections.map(c=>'<span class="chip static">'+c+'</span>').join('')+'</div>';
+    if(a.corrections&&a.corrections.length)sc+='<div class="stage ok" style="margin-top:8px">✏️ Fixed words</div><div class="chips">'+a.corrections.map(c=>'<span class="chip static">'+c+'</span>').join('')+'</div>';
+    if(a.corrections_not_found&&a.corrections_not_found.length)sc+='<div class="stage err" style="margin-top:8px">Couldn\'t find '+a.corrections_not_found.map(c=>'“'+c+'”').join(', ')+' in the captions — open “What it heard” below and use the exact word it typed.</div>';
     let tr='';if(a.transcript)tr='<details class="tr" style="margin-top:10px"><summary>What it heard</summary><div class="stage" style="margin-top:6px">'+a.transcript+'</div></details>';
     $('preview').innerHTML='<video src="'+j.url+'" controls autoplay muted playsinline></video><div class="chips" style="margin-top:10px">'+chips+'</div>'+sc+tr+
       '<a class="dl" href="'+j.url+'" download>⬇ Download MP4</a>'+fixbarHTML();

@@ -128,9 +128,18 @@ def render_video(
         # per-render caption fixes typed by the user ("change X to Y")
         job_corr = cap.get("corrections")
         if words and job_corr:
+            from .knowledge import _norm
+            joined = " ".join(_norm(w.text) for w in words)
+            not_found = []
+            for k in job_corr:
+                toks = " ".join(t for t in (_norm(x) for x in str(k).split()) if t)
+                if toks and toks not in joined:
+                    not_found.append(str(k))
             words, jf = knowledge.correct_words(words, job_corr)
             if jf:
                 applied.setdefault("corrections", []).extend(jf)
+            if not_found:
+                applied["corrections_not_found"] = not_found
 
     if words:
         applied["transcript"] = " ".join(w.text for w in words)
