@@ -21,7 +21,8 @@ COPY . .
 
 EXPOSE 8080
 
-# faster-whisper caches its model here; mount a volume to persist it
+# faster-whisper caches its model here; mount a volume to persist it. On hosts
+# that inject $PORT (Render/Railway/Fly), run.py binds that automatically.
 ENV HF_HOME=/root/.cache/huggingface
 
-CMD ["python", "run.py", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["python", "run.py", "--host", "0.0.0.0"]

@@ -10,6 +10,7 @@ Then open http://localhost:8080  (or your chosen port).
 from __future__ import annotations
 
 import argparse
+import os
 
 import uvicorn
 
@@ -21,9 +22,12 @@ def main() -> None:
     cfg = load_config()
     server = cfg.get("server", {})
 
+    # Hosts like Render/Railway/Fly inject the port to bind via $PORT.
+    default_port = int(os.environ.get("PORT") or server.get("port", 8080))
+
     ap = argparse.ArgumentParser(description="SSGP Editor server")
     ap.add_argument("--host", default=server.get("host", "0.0.0.0"))
-    ap.add_argument("--port", type=int, default=int(server.get("port", 8080)))
+    ap.add_argument("--port", type=int, default=default_port)
     ap.add_argument("--reload", action="store_true", help="auto-reload on code changes (dev)")
     args = ap.parse_args()
 
