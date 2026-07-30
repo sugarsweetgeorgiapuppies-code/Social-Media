@@ -99,15 +99,15 @@ def hdr_to_sdr_prefilter(info: "ProbeInfo") -> str:
     if not info.is_hdr:
         return ""
     if has_filter("zscale") and has_filter("tonemap"):
+        # proper HDR->SDR tone-map (needs libzimg)
         return ("zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,"
                 "tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p,")
     if has_filter("libplacebo"):
         return "libplacebo=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv,format=yuv420p,"
-    if has_filter("colorspace"):
-        # core filter, no external libs — matrix/primaries convert + slight lift
-        return "colorspace=all=bt709:iall=bt2020ncl:range=tv:fast=1,eq=saturation=1.06,format=yuv420p,"
-    # last resort: matrix convert + saturation nudge to fight the wash
-    return "scale=in_color_matrix=bt2020:out_color_matrix=bt709,eq=saturation=1.12:contrast=1.03,format=yuv420p,"
+    # No proper tone-mapper (lean ffmpeg): convert the YUV matrix bt2020->bt709
+    # with the core scale filter and lift the flatness a touch. This removes the
+    # washed/grey look; it isn't a full tone-map but never errors.
+    return "scale=in_color_matrix=bt2020:out_color_matrix=bt709,eq=saturation=1.1:contrast=1.04,format=yuv420p,"
 
 
 # SDR BT.709 output tags — set on every encode so players never misread the file
