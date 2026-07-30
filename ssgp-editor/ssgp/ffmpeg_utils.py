@@ -52,6 +52,67 @@ class ProbeInfo:
     has_audio: bool
     video_codec: str
     audio_codec: Optional[str]
+    color_space: str = ""
+    color_transfer: str = ""
+    color_primaries: str = ""
+
+    @property
+    def is_hdr(self) -> bool:
+        """iPhone HDR (HLG / Dolby Vision) shows washed-out/grey if not tone-
+        mapped to SDR. Detect it from the color metadata."""
+        cs = (self.color_space or "").lower()
+        trc = (self.color_transfer or "").lower()
+        prm = (self.color_primaries or "").lower()
+        return (cs.startswith("bt2020") or prm.startswith("bt2020")
+                or trc in ("smpte2084", "arib-std-b67"))
+
+
+_FILTERS_CACHE: Optional[set] = None
+
+
+def has_filter(name: str) -> bool:
+    """True if the local ffmpeg build provides the given filter."""
+    global _FILTERS_CACHE
+    if _FILTERS_CACHE is None:
+        _FILTERS_CACHE = set()
+        try:
+            out = subprocess.run(["ffmpeg", "-hide_banner", "-filters"],
+                                  capture_output=True, text=True).stdout
+            for line in out.splitlines():
+                parts = line.split()
+                if len(parts) >= 2 and parts[0].isalpha() is False:
+                    # lines look like: " ... name  V->V  desc"
+                    pass
+            # simpler: collect the second token of each filter line
+            for line in out.splitlines():
+                toks = line.strip().split()
+                if len(toks) >= 3 and "->" in toks[2]:
+                    _FILTERS_CACHE.add(toks[1])
+        except Exception:
+            _FILTERS_CACHE = set()
+    return name in _FILTERS_CACHE
+
+
+def hdr_to_sdr_prefilter(info: "ProbeInfo") -> str:
+    """A filter-chain prefix (ending with a comma) that converts HDR footage to
+    SDR BT.709 using the best filter this ffmpeg has. Empty string for SDR."""
+    if not info.is_hdr:
+        return ""
+    if has_filter("zscale") and has_filter("tonemap"):
+        return ("zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,"
+                "tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p,")
+    if has_filter("libplacebo"):
+        return "libplacebo=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv,format=yuv420p,"
+    if has_filter("colorspace"):
+        # core filter, no external libs — matrix/primaries convert + slight lift
+        return "colorspace=all=bt709:iall=bt2020ncl:range=tv:fast=1,eq=saturation=1.06,format=yuv420p,"
+    # last resort: matrix convert + saturation nudge to fight the wash
+    return "scale=in_color_matrix=bt2020:out_color_matrix=bt709,eq=saturation=1.12:contrast=1.03,format=yuv420p,"
+
+
+# SDR BT.709 output tags — set on every encode so players never misread the file
+SDR_TAGS = ["-colorspace", "bt709", "-color_primaries", "bt709",
+            "-color_trc", "bt709", "-color_range", "tv"]
 
 
 def probe(path: str) -> ProbeInfo:
@@ -96,6 +157,9 @@ def probe(path: str) -> ProbeInfo:
         has_audio=a is not None,
         video_codec=v.get("codec_name", ""),
         audio_codec=(a or {}).get("codec_name"),
+        color_space=v.get("color_space", "") or "",
+        color_transfer=v.get("color_transfer", "") or "",
+        color_primaries=v.get("color_primaries", "") or "",
     )
 
 

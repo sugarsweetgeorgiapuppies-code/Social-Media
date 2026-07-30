@@ -90,6 +90,9 @@
   .dl{display:inline-block;margin-top:10px;color:var(--yellow);text-decoration:none;font-weight:700;font-size:14px}
   .empty{color:var(--muted);font-size:13px;text-align:center;padding:38px 10px}
   details.tr summary{cursor:pointer;color:var(--muted);font-size:12px}
+  .fixbar{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+  .fixbar .ttl{font-size:12px;color:var(--muted);margin-bottom:8px}
+  .fixbar input{margin-top:8px}
 </style>
 </head>
 <body>
@@ -312,7 +315,8 @@ async function checkStatus(id){
     if(a.dog_cut){const d=a.dog_cut;sc+='<div class="stage '+(d.status==='ok'?'ok':(d.status==='error'?'err':''))+'" style="margin-top:8px">🐶 Dog cut: '+(d.detail||d.status)+'</div>';}
     if(a.corrections&&a.corrections.length)sc+='<div class="stage ok" style="margin-top:8px">🐶 Fixed breed names</div><div class="chips">'+a.corrections.map(c=>'<span class="chip static">'+c+'</span>').join('')+'</div>';
     let tr='';if(a.transcript)tr='<details class="tr" style="margin-top:10px"><summary>What it heard</summary><div class="stage" style="margin-top:6px">'+a.transcript+'</div></details>';
-    $('preview').innerHTML='<video src="'+j.url+'" controls autoplay muted playsinline></video><div class="chips" style="margin-top:10px">'+chips+'</div>'+sc+tr+'<a class="dl" href="'+j.url+'" download>⬇ Download MP4</a>';
+    $('preview').innerHTML='<video src="'+j.url+'" controls autoplay muted playsinline></video><div class="chips" style="margin-top:10px">'+chips+'</div>'+sc+tr+
+      '<a class="dl" href="'+j.url+'" download>⬇ Download MP4</a>'+fixbarHTML();
   }else if(j.status==='failed'){clearInterval(poll);$('go').disabled=false;setStage('Failed: '+(j.error||'error'),'err');$('preview').innerHTML='<div class="empty">Render failed.</div>';}
   else setStage((j.stage||j.status)+'…');
 }
@@ -334,6 +338,31 @@ async function checkBatch(ids){
   }
   if(done>=ids.length){clearInterval(poll);$('go').disabled=false;setStage('Done ✓ '+ids.length+' Reels','ok');}
 }
+
+/* ---- post-render QUICK FIXES: tweak a setting and re-render the same clip ---- */
+function fixbarHTML(){
+  return '<div class="fixbar"><div class="ttl">Not quite right? One-tap fixes — re-renders this clip:</div><div class="chips">'
+    +'<span class="chip" onclick="fix.capLater()">Captions too early →&nbsp;later</span>'
+    +'<span class="chip" onclick="fix.capEarlier()">Captions too late →&nbsp;earlier</span>'
+    +'<span class="chip" onclick="fix.capOff()">Turn captions off</span>'
+    +'<span class="chip" onclick="fix.cutLess()">Cut less (kept too little)</span>'
+    +'<span class="chip" onclick="fix.cutOff()">Stop cutting</span>'
+    +'<span class="chip" onclick="fix.musicUp()">Music up</span>'
+    +'<span class="chip" onclick="fix.musicDown()">Music down</span>'
+    +'</div><div style="display:flex;gap:8px"><input type="text" id="fixNote" placeholder="…or tell me what to fix in words"><button class="chip" style="border-color:var(--teal-dim);color:var(--text)" onclick="fix.note()">Redo</button></div></div>';
+}
+function nudge(id,d,mn,mx){const e=$(id);e.value=Math.max(mn,Math.min(mx,(parseFloat(e.value)||0)+d));e.dispatchEvent(new Event('input'));}
+const fix={
+  capLater:()=>{nudge('s_captime',0.2,-1.5,1.5);submit();},
+  capEarlier:()=>{nudge('s_captime',-0.2,-1.5,1.5);submit();},
+  capOff:()=>{$('t_captions').checked=false;submit();},
+  cutLess:()=>{nudge('s_sil',-5,-50,-10);submit();},   /* more negative = fewer cuts */
+  cutOff:()=>{$('t_cuts').checked=false;submit();},
+  musicUp:()=>{nudge('s_music',0.08,0,1);submit();},
+  musicDown:()=>{nudge('s_music',-0.08,0,1);submit();},
+  note:()=>{const n=($('fixNote')?$('fixNote').value:'').trim();if(n){const ta=$('instructions');ta.value=(ta.value.trim()?ta.value.trim().replace(/[.,\s]*$/,'')+', ':'')+n;}submit();}
+};
+window.fix=fix;
 
 $('go').addEventListener('click',submit);
 </script>

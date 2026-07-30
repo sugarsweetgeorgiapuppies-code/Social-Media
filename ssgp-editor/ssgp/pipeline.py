@@ -28,8 +28,10 @@ from . import smartcut
 from . import textrender
 from .config import resolve_path
 from .ffmpeg_utils import (
+    SDR_TAGS,
     ProbeInfo,
     ensure_ffmpeg,
+    hdr_to_sdr_prefilter,
     probe,
     run,
 )
@@ -138,8 +140,10 @@ def render_video(
     # ---- 5) style the FULL clip: reframe + zoom + captions + watermark -----
     progress(48, "video")
     styled_full = str(work / "styled_full.mp4")
+    color_prefix = hdr_to_sdr_prefilter(info)  # HDR iPhone footage -> SDR (fixes grey/washed look)
+    applied["hdr_tonemapped"] = bool(color_prefix)
     _video_pass(source_path, styled_full, cfg, W, H, FPS, src_duration,
-                [(0.0, src_duration)], caption_list, fonts_dir, work, log_path)
+                [(0.0, src_duration)], caption_list, fonts_dir, work, log_path, color_prefix)
     applied["zoom"] = bool(cfg["zoom"].get("enabled"))
     applied["watermark"] = bool(cfg["watermark"].get("enabled"))
     applied["captions"] = caption_list is not None
@@ -275,7 +279,7 @@ def _apply_cuts_av(video_src: str, audio_src: str, dst: str, keeps: Sequence[Seg
         "ffmpeg", "-y", *inputs, "-filter_complex", fc, *maps,
         "-c:v", o.get("video_codec", "libx264"), "-crf", str(o.get("crf", 20)),
         "-preset", o.get("preset", "medium"), "-pix_fmt", o.get("pixel_format", "yuv420p"),
-        "-r", str(fps),
+        *SDR_TAGS, "-r", str(fps),
     ]
     if has_audio:
         cmd += ["-c:a", "aac", "-b:a", o.get("audio_bitrate", "192k")]
@@ -313,13 +317,14 @@ def _zoompan_expr(cfg: dict, duration: float, fps: int, keeps: Sequence[Segment]
     return expr
 
 
-def _video_pass(src, dst, cfg, W, H, FPS, duration, keeps, caption_list, fonts_dir, work, log_path):
+def _video_pass(src, dst, cfg, W, H, FPS, duration, keeps, caption_list, fonts_dir, work, log_path, color_prefix=""):
     """Reframe to vertical, add motion, then composite caption + watermark PNGs.
 
-    Text is drawn by Pillow into transparent overlays (see textrender), so this
-    works on FFmpeg builds without libass/freetype.
+    ``color_prefix`` (from hdr_to_sdr_prefilter) tone-maps HDR iPhone footage to
+    SDR up front so the result isn't washed-out/grey. Text is drawn by Pillow
+    into transparent overlays, so this works on FFmpeg builds without libass.
     """
-    # base video chain (no text): reframe + optional zoom
+    # base video chain: HDR->SDR (if any) + reframe + optional zoom
     base = [
         f"fps={FPS}",
         f"scale={W}:{H}:force_original_aspect_ratio=increase",
@@ -334,7 +339,7 @@ def _video_pass(src, dst, cfg, W, H, FPS, duration, keeps, caption_list, fonts_d
     base.append("setsar=1")  # square pixels (zoompan can emit odd SAR)
 
     inputs = ["-i", src]
-    fc = f"[0:v]{','.join(base)}[base]"
+    fc = f"[0:v]{color_prefix}{','.join(base)}[base]"
     last = "base"
     idx = 1
 
@@ -345,9 +350,9 @@ def _video_pass(src, dst, cfg, W, H, FPS, duration, keeps, caption_list, fonts_d
         last = "vc"
         idx += 1
 
-    # watermark overlay (single static PNG)
+    # watermark overlay (single static PNG — logo or text)
     wm = cfg["watermark"]
-    if wm.get("enabled") and wm.get("text"):
+    if wm.get("enabled") and (wm.get("logo") or wm.get("text")):
         wm_png = work / "watermark.png"
         textrender.render_watermark(wm, fonts_dir, W, H, wm_png)
         inputs += ["-loop", "1", "-i", str(wm_png)]
@@ -360,7 +365,7 @@ def _video_pass(src, dst, cfg, W, H, FPS, duration, keeps, caption_list, fonts_d
         "ffmpeg", "-y", *inputs, "-filter_complex", fc, "-map", f"[{last}]", "-an",
         "-c:v", o.get("video_codec", "libx264"), "-crf", str(o.get("crf", 20)),
         "-preset", o.get("preset", "medium"), "-pix_fmt", o.get("pixel_format", "yuv420p"),
-        "-r", str(FPS), "-t", f"{duration:.3f}", dst,
+        *SDR_TAGS, "-r", str(FPS), "-t", f"{duration:.3f}", dst,
     ], log_path)
 
 
@@ -462,7 +467,7 @@ def _build_cta_card(dst, cfg, W, H, FPS, fonts_dir, work, log_path):
         "-t", f"{dur}",
         "-c:v", o.get("video_codec", "libx264"), "-crf", str(o.get("crf", 20)),
         "-preset", o.get("preset", "medium"), "-pix_fmt", o.get("pixel_format", "yuv420p"),
-        "-c:a", "aac", "-b:a", "128k", "-r", str(FPS), dst,
+        *SDR_TAGS, "-c:a", "aac", "-b:a", "128k", "-r", str(FPS), dst,
     ], log_path)
 
 
@@ -483,7 +488,7 @@ def _concat_finalise(parts: Sequence[str], out_path: str, cfg, log_path):
         "-map", "[v]", "-map", "[a]",
         "-c:v", o.get("video_codec", "libx264"), "-crf", str(o.get("crf", 20)),
         "-preset", o.get("preset", "medium"), "-pix_fmt", o.get("pixel_format", "yuv420p"),
-        "-c:a", "aac", "-b:a", o.get("audio_bitrate", "192k"), *movflags, out_path,
+        *SDR_TAGS, "-c:a", "aac", "-b:a", o.get("audio_bitrate", "192k"), *movflags, out_path,
     ], log_path)
 
 
