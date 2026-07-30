@@ -25,6 +25,7 @@ from . import knowledge
 from . import music as music_mod
 from . import silence as silence_mod
 from . import smartcut
+from . import graphics as graphics_mod
 from . import textrender
 from .config import resolve_path
 from .ffmpeg_utils import (
@@ -154,6 +155,20 @@ def render_video(
         progress(30, "captions")
         caption_list = textrender.build_caption_track(words, cfg["captions"], fonts_dir, W, H, work, FPS)
 
+    # ---- 4b) smart graphics: opening hook + keyword pop-ups (ORIGINAL timeline)
+    # Same lockstep-safe overlay approach as captions, so it's cut in sync too.
+    graphics_list = None
+    gfx = cfg.get("graphics", {}) or {}
+    if words and gfx.get("enabled", True):
+        progress(40, "graphics")
+        try:
+            know = knowledge.load_knowledge()
+            graphics_list, gsum = graphics_mod.build_graphics_track(
+                words, know, gfx, fonts_dir, W, H, work, FPS)
+            applied["graphics"] = {"hook": gsum.get("hook"), "pops": gsum.get("pops", 0)}
+        except Exception as exc:  # never fail a render over graphics
+            applied["graphics_error"] = str(exc)
+
     # ---- 5) style the FULL clip: reframe + zoom + captions + watermark -----
     progress(48, "video")
     styled_full = str(work / "styled_full.mp4")
@@ -161,7 +176,8 @@ def render_video(
     applied["hdr_tonemapped"] = bool(color_prefix)
     applied["hdr_quality"] = hdr_quality(info)  # "", "proper", or "approx"
     _video_pass(source_path, styled_full, cfg, W, H, FPS, src_duration,
-                [(0.0, src_duration)], caption_list, fonts_dir, work, log_path, color_prefix)
+                [(0.0, src_duration)], caption_list, fonts_dir, work, log_path, color_prefix,
+                graphics_list)
     applied["zoom"] = bool(cfg["zoom"].get("enabled"))
     applied["watermark"] = bool(cfg["watermark"].get("enabled"))
     applied["captions"] = caption_list is not None
@@ -208,16 +224,24 @@ def render_video(
         applied["dog_cut"] = {"status": dc.get("status"), "detail": dc.get("detail"),
                               "removed": [[round(s, 2), round(e, 2)] for s, e in dremovals]}
 
-    # optional target/max length cap
-    max_dur = cfg["output"].get("max_duration")
-    if max_dur and silence_mod.total_kept_duration(keeps) > float(max_dur):
-        keeps = silence_mod.cap_keeps(keeps, float(max_dur))
-        applied["capped_to"] = float(max_dur)
-
     applied["segments_kept"] = len(keeps)
 
     cut_duration = silence_mod.total_kept_duration(keeps)
-    applied["output_duration"] = round(cut_duration, 2)
+
+    # ---- target length: FIT everything into it (compress), never hard-chop ---
+    # "make it 30 seconds" means squeeze ALL the content into 30s by speeding it
+    # up a touch (dead air is already trimmed above) — NOT cut it off at 30s. We
+    # only speed up as far as still sounds natural (max_speed), so nothing is
+    # lost; if it can't reach the target within that limit we get as close as we
+    # can and say so.
+    target = cfg["output"].get("max_duration")
+    fit_speed = 1.0
+    if target and cut_duration > float(target) + 0.05:
+        max_speed = float(cfg["output"].get("max_speed", 1.35))
+        fit_speed = min(max_speed, cut_duration / float(target))
+        applied["fit_target"] = float(target)
+
+    applied["output_duration"] = round(cut_duration / fit_speed, 2)
     single_segment = len(keeps) == 1 and abs(keeps[0][0]) < 1e-3 and abs(keeps[0][1] - src_duration) < 0.05
 
     # ---- 7) cut the captioned video + source audio together (lockstep) ----
@@ -248,15 +272,30 @@ def render_video(
         "-shortest", main_mp4,
     ], log_path)
 
+    # fit-to-length: speed the finished body up (video + audio together) so it
+    # lands at the target without dropping any content. CTA is appended AFTER,
+    # so the outro keeps its normal pace.
+    body = main_mp4
+    if fit_speed > 1.001:
+        progress(95, "fit-length")
+        sped = str(work / "sped.mp4")
+        _apply_speed(main_mp4, sped, fit_speed, cfg, FPS, log_path)
+        body = sped
+        applied["speed"] = round(fit_speed, 2)
+        final_dur = cut_duration / fit_speed
+        if target and final_dur > float(target) + 0.3:
+            applied["fit_note"] = (f"squeezed to {round(final_dur, 1)}s — as short as it "
+                                   f"gets while the voice still sounds natural")
+
     cta = cfg["cta"]
     if cta.get("enabled") and (cta.get("title") or cta.get("phone")):
         progress(97, "cta")
         card = str(work / "card.mp4")
         _build_cta_card(card, cfg, W, H, FPS, fonts_dir, work, log_path)
-        _concat_finalise([main_mp4, card], out_path, cfg, log_path)
+        _concat_finalise([body, card], out_path, cfg, log_path)
         applied["cta"] = True
     else:
-        _finalise_copy(main_mp4, out_path, cfg, log_path)
+        _finalise_copy(body, out_path, cfg, log_path)
         applied["cta"] = False
 
     progress(100, "done")
@@ -335,7 +374,7 @@ def _zoompan_expr(cfg: dict, duration: float, fps: int, keeps: Sequence[Segment]
     return expr
 
 
-def _video_pass(src, dst, cfg, W, H, FPS, duration, keeps, caption_list, fonts_dir, work, log_path, color_prefix=""):
+def _video_pass(src, dst, cfg, W, H, FPS, duration, keeps, caption_list, fonts_dir, work, log_path, color_prefix="", graphics_list=None):
     """Reframe to vertical, add motion, then composite caption + watermark PNGs.
 
     ``color_prefix`` (from hdr_to_sdr_prefilter) tone-maps HDR iPhone footage to
@@ -366,6 +405,13 @@ def _video_pass(src, dst, cfg, W, H, FPS, duration, keeps, caption_list, fonts_d
         inputs += ["-f", "concat", "-safe", "0", "-i", caption_list]
         fc += f";[{idx}:v]fps={FPS},format=rgba[cap];[{last}][cap]overlay=0:0:eof_action=pass:shortest=0[vc]"
         last = "vc"
+        idx += 1
+
+    # smart-graphics overlay track (hook + pops), composited above captions
+    if graphics_list:
+        inputs += ["-f", "concat", "-safe", "0", "-i", graphics_list]
+        fc += f";[{idx}:v]fps={FPS},format=rgba[gfx];[{last}][gfx]overlay=0:0:eof_action=pass:shortest=0[vg]"
+        last = "vg"
         idx += 1
 
     # watermark overlay (single static PNG — logo or text)
@@ -507,6 +553,19 @@ def _concat_finalise(parts: Sequence[str], out_path: str, cfg, log_path):
         "-c:v", o.get("video_codec", "libx264"), "-crf", str(o.get("crf", 20)),
         "-preset", o.get("preset", "medium"), "-pix_fmt", o.get("pixel_format", "yuv420p"),
         *SDR_TAGS, "-c:a", "aac", "-b:a", o.get("audio_bitrate", "192k"), *movflags, out_path,
+    ], log_path)
+
+
+def _apply_speed(src: str, dst: str, sf: float, cfg, FPS: int, log_path):
+    """Speed the whole clip up by ``sf`` (video + audio locked together) to fit a
+    target length. atempo keeps the voice pitch natural up to ~1.35x."""
+    o = cfg["output"]
+    fc = f"[0:v]setpts=PTS/{sf:.5f}[v];[0:a]atempo={sf:.5f}[a]"
+    run([
+        "ffmpeg", "-y", "-i", src, "-filter_complex", fc, "-map", "[v]", "-map", "[a]",
+        "-c:v", o.get("video_codec", "libx264"), "-crf", str(o.get("crf", 20)),
+        "-preset", o.get("preset", "medium"), "-pix_fmt", o.get("pixel_format", "yuv420p"),
+        *SDR_TAGS, "-c:a", "aac", "-b:a", o.get("audio_bitrate", "192k"), "-r", str(FPS), dst,
     ], log_path)
 
 

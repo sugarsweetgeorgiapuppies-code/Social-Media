@@ -140,7 +140,7 @@
     <!-- 3. LENGTH -->
     <div class="card">
       <h2><span class="step">3</span> · Length</h2>
-      <p class="help">Cap how long the finished Reel can be. Auto keeps whatever's left after cutting.</p>
+      <p class="help">Fit <b>everything</b> into this length — I trim dead air and speed it up a touch so nothing he says gets lost. Auto keeps the natural length.</p>
       <div class="seg" id="lenSeg">
         <button data-sec="" class="on">Auto</button>
         <button data-sec="15">15s</button>
@@ -167,6 +167,7 @@
       </div>
       <div class="grp-label">Smart</div>
       <div class="tgl-grp">
+        <label class="tgl"><span class="txt"><b>Text pops ✨</b><span>hook + word call-outs</span></span><span class="sw"><input type="checkbox" id="t_graphics" checked><span class="sl"></span></span></label>
         <label class="tgl"><span class="txt"><b>Smart cut ✨</b><span>AI removes mistakes</span></span><span class="sw"><input type="checkbox" id="t_smart"><span class="sl"></span></span></label>
         <label class="tgl"><span class="txt"><b>Cut to dogs 🐶</b><span>keep only puppy shots</span></span><span class="sw"><input type="checkbox" id="t_dogcut"><span class="sl"></span></span></label>
         <label class="tgl"><span class="txt"><b>Music only 🎵</b><span>remove the voice</span></span><span class="sw"><input type="checkbox" id="t_musiconly"><span class="sl"></span></span></label>
@@ -254,6 +255,7 @@ fetch('/api/config').then(r=>r.json()).then(c=>{try{
   $('s_sil').value=c.cuts.silence_threshold_db;$('s_sil').dispatchEvent(new Event('input'));
   $('model').value=c.captions.model||'small';
   $('t_cta').checked=!!c.cta.enabled; $('t_smart').checked=!!(c.cuts&&c.cuts.smart_cut);
+  if(c.graphics) $('t_graphics').checked=c.graphics.enabled!==false;
 }catch(e){}}).catch(()=>{});
 
 function collectOptions(){
@@ -266,6 +268,7 @@ function collectOptions(){
     music:{enabled:$('t_music').checked,volume:parseFloat($('s_music').value),track:$('track').value||null,replace_voice:$('t_musiconly').checked},
     watermark:$('t_watermark').checked,
     cta:$('t_cta').checked,
+    graphics:$('t_graphics').checked,
     silence_threshold_db:parseInt($('s_sil').value,10),
     max_duration:maxDuration
   };
@@ -313,6 +316,8 @@ async function checkStatus(id){
     let sc='';
     if(a.smart_cut){const s=a.smart_cut;sc+='<div class="stage '+(s.status==='ok'?'ok':(s.status==='error'?'err':''))+'" style="margin-top:10px">✂️ Smart cut: '+(s.detail||s.status)+'</div>';}
     if(a.dog_cut){const d=a.dog_cut;sc+='<div class="stage '+(d.status==='ok'?'ok':(d.status==='error'?'err':''))+'" style="margin-top:8px">🐶 Dog cut: '+(d.detail||d.status)+'</div>';}
+    if(a.graphics&&(a.graphics.hook||a.graphics.pops)){const g=a.graphics;let bits=[];if(g.hook)bits.push('hook “'+g.hook+'”');if(g.pops)bits.push(g.pops+' pop'+(g.pops!==1?'s':''));sc+='<div class="stage ok" style="margin-top:8px">✨ Text pops: '+bits.join(' · ')+'</div>';}
+    if(a.speed){sc+='<div class="stage" style="margin-top:8px">⏩ Fit to '+(a.fit_target?a.fit_target+'s':'length')+': sped '+a.speed+'× (nothing cut)'+(a.fit_note?' — '+a.fit_note:'')+'</div>';}
     if(a.corrections&&a.corrections.length)sc+='<div class="stage ok" style="margin-top:8px">✏️ Fixed words</div><div class="chips">'+a.corrections.map(c=>'<span class="chip static">'+c+'</span>').join('')+'</div>';
     if(a.corrections_not_found&&a.corrections_not_found.length)sc+='<div class="stage err" style="margin-top:8px">Couldn\'t find '+a.corrections_not_found.map(c=>'“'+c+'”').join(', ')+' in the captions — open “What it heard” below and use the exact word it typed.</div>';
     if(a.hdr_quality==='proper')sc+='<div class="stage ok" style="margin-top:8px">🎨 HDR color fixed (true tone-map)</div>';

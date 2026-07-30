@@ -69,6 +69,7 @@ _FLAT_MAP = {
     "music": ("music", "enabled"),
     "watermark": ("watermark", "enabled"),
     "cta": ("cta", "enabled"),
+    "graphics": ("graphics", "enabled"),
     "music_volume": ("music", "volume"),
     "music_track": ("music", "track"),
     "zoom_intensity": ("zoom", "intensity"),

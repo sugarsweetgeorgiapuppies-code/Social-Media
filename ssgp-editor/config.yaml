@@ -19,7 +19,11 @@ output:
   preset: medium       # x264 speed/size tradeoff (ultrafast..veryslow)
   audio_bitrate: 192k
   faststart: true      # move moov atom to front so it streams/plays instantly
-  max_duration: null   # cap the finished length in seconds (null = no cap / keep whatever's left)
+  max_duration: null   # TARGET length in seconds. The clip is COMPRESSED to fit into this
+                       # (dead air trimmed + gently sped up) — it is NOT chopped off at N
+                       # seconds, so nothing he says is lost. null = keep the natural length.
+  max_speed: 1.35      # the most the clip will be sped up to hit the target before we stop
+                       # (beyond ~1.35x the voice starts to sound rushed). Content is never cut.
 
 # ---------------------------------------------------------------------------
 # 1) AUTO CUTS — remove dead air / long silences so the clip stays tight.
@@ -87,6 +91,37 @@ captions:
   uppercase: false            # set true for ALL-CAPS captions
   line_pause: 0.5             # seconds of silence that forces a new caption line
   time_offset: 0.0            # nudge all captions earlier(-) or later(+) in seconds, if they feel a touch ahead/behind
+
+# ---------------------------------------------------------------------------
+# 2b) SMART GRAPHICS — the "real editing" layer. An opening HOOK title card
+#     plus animated KEYWORD POP-UPS timed to the speech (breed names, prices,
+#     "first / second / third", "hypoallergenic", …). Drawn by Pillow like the
+#     captions, so it works on any FFmpeg and never drifts out of sync.
+# ---------------------------------------------------------------------------
+graphics:
+  enabled: true
+  hook: true                 # show an opening headline card
+  headline: null             # force a specific headline; null = auto ("3 things", or AI)
+  hook_seconds: 2.2          # how long the hook card stays up
+  use_ai: true               # let Claude write a snappier hook when an API key is set
+  pops: true                 # animated word call-outs during the clip
+  max_pops: 7                # at most this many pops in one clip
+  min_spacing: 2.0           # seconds between pops (keeps it from getting busy)
+  pop_hold: 1.1              # seconds each pop stays up
+  pop_uppercase: true        # POP words in caps for punch
+  # look
+  hook_size: 92
+  hook_color: "#ffffff"
+  hook_band: "#12263a"       # translucent band behind the headline (brand navy)
+  hook_band_opacity: 0.72
+  hook_pos_pct: 0.16         # headline vertical position (0=top .. 1=bottom)
+  hook_stroke: 5
+  pop_size: 104
+  pop_color: "#ffd23f"       # brand yellow
+  pop_stroke: "#12263a"      # dark outline
+  pop_stroke_w: 8
+  pop_pos_pct: 0.42          # pop vertical position (upper-middle, above captions)
+  badge_size: 150            # diameter of the number badge for "first/second/third"
 
 # ---------------------------------------------------------------------------
 # 3) AUTO ZOOM / PUNCH-IN — subtle motion so the clip never feels static.

@@ -37,8 +37,13 @@ Options you may set (include ONLY what the request asks for; omit the rest):
   from what was said.)
 - watermark.enabled (bool).
 - cta.enabled (bool): the end card.
-- output.max_duration (number, seconds): cap the finished length. e.g. "make it
-  30 seconds" -> 30, "under a minute" -> 60, "keep it to 15s" -> 15.
+- output.max_duration (number, seconds): TARGET length — the clip is compressed
+  (dead air trimmed + gently sped up) to FIT everything into this many seconds;
+  it is NOT chopped off. e.g. "make it 30 seconds" -> 30, "fit it in a minute"
+  -> 60, "keep it to 15s" -> 15.
+- graphics.enabled (bool): the smart title card + animated word pop-ups. Turn
+  OFF for "no text pops", "no graphics", "just captions", "plain".
+- graphics.headline (str): force the opening hook text, e.g. 'say "3 reasons"'.
 """
 
 
@@ -170,10 +175,18 @@ def _interpret_rules(t: str) -> Tuple[Dict, List[str]]:
     if _has(t, "cta", "end card", "call to action", "outro", "add the card", "closing card"):
         set_("cta", "enabled", True, "CTA end card on")
 
-    # target / max length
+    # smart graphics (title card + word pops)
+    if _has(t, "no text pops", "no pops", "no graphics", "no title card", "no text overlay",
+            "just captions", "plain", "no popups", "no pop ups"):
+        set_("graphics", "enabled", False, "graphics off")
+    elif _has(t, "add pops", "text pops", "add graphics", "title card", "add a hook",
+              "add popups", "pop ups", "make it punchy", "add text pops"):
+        set_("graphics", "enabled", True, "graphics on")
+
+    # target length (fit everything into it, don't chop)
     secs = _parse_length(t)
     if secs:
-        set_("output", "max_duration", secs, f"max length {secs}s")
+        set_("output", "max_duration", secs, f"fit into {secs:g}s")
 
     # language
     for lang, code in {"spanish": "es", "french": "fr", "german": "de", "portuguese": "pt"}.items():
