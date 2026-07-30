@@ -32,6 +32,7 @@ from .ffmpeg_utils import (
     ProbeInfo,
     ensure_ffmpeg,
     hdr_to_sdr_prefilter,
+    hdr_quality,
     probe,
     run,
 )
@@ -158,6 +159,7 @@ def render_video(
     styled_full = str(work / "styled_full.mp4")
     color_prefix = hdr_to_sdr_prefilter(info)  # HDR iPhone footage -> SDR (fixes grey/washed look)
     applied["hdr_tonemapped"] = bool(color_prefix)
+    applied["hdr_quality"] = hdr_quality(info)  # "", "proper", or "approx"
     _video_pass(source_path, styled_full, cfg, W, H, FPS, src_duration,
                 [(0.0, src_duration)], caption_list, fonts_dir, work, log_path, color_prefix)
     applied["zoom"] = bool(cfg["zoom"].get("enabled"))

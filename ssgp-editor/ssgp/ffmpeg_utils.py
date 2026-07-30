@@ -93,6 +93,19 @@ def has_filter(name: str) -> bool:
     return name in _FILTERS_CACHE
 
 
+def hdr_quality(info: "ProbeInfo") -> str:
+    """Which HDR->SDR path will run for this clip:
+    ""       -> not HDR, nothing to do
+    "proper" -> real tone-map (zscale/libplacebo) — picture-perfect color
+    "approx" -> lean-ffmpeg fallback — de-greys it, but not a true tone-map
+    """
+    if not info.is_hdr:
+        return ""
+    if (has_filter("zscale") and has_filter("tonemap")) or has_filter("libplacebo"):
+        return "proper"
+    return "approx"
+
+
 def hdr_to_sdr_prefilter(info: "ProbeInfo") -> str:
     """A filter-chain prefix (ending with a comma) that converts HDR footage to
     SDR BT.709 using the best filter this ffmpeg has. Empty string for SDR."""
@@ -104,10 +117,15 @@ def hdr_to_sdr_prefilter(info: "ProbeInfo") -> str:
                 "tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p,")
     if has_filter("libplacebo"):
         return "libplacebo=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv,format=yuv420p,"
-    # No proper tone-mapper (lean ffmpeg): convert the YUV matrix bt2020->bt709
-    # with the core scale filter and lift the flatness a touch. This removes the
-    # washed/grey look; it isn't a full tone-map but never errors.
-    return "scale=in_color_matrix=bt2020:out_color_matrix=bt709,eq=saturation=1.1:contrast=1.04,format=yuv420p,"
+    # No proper tone-mapper (lean ffmpeg): do the bt2020->bt709 matrix conversion
+    # and counteract the flat, washed-out "grey" look that HLG/PQ footage takes on
+    # when it isn't tone-mapped — its blacks are lifted, contrast is low and colour
+    # is dull. We darken slightly, add contrast and restore saturation so it reads
+    # like normal SDR video. Approximate, but never errors. For picture-perfect
+    # colour, install an ffmpeg that has zscale (see README).
+    return ("scale=in_color_matrix=bt2020:out_color_matrix=bt709,"
+            "eq=contrast=1.16:saturation=1.32:gamma=0.94:brightness=-0.02,"
+            "format=yuv420p,")
 
 
 # SDR BT.709 output tags — set on every encode so players never misread the file
