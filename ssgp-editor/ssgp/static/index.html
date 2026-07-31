@@ -263,6 +263,10 @@
             <div class="txt"><b>Reduce background noise</b><span>cleaner, but can sound processed</span></div>
             <label class="sw"><input type="checkbox" id="t_denoise"><span class="sl"></span></label>
           </div>
+          <div class="tgl">
+            <div class="txt"><b>Fix HDR color</b><span>only if the video looks washed-out or grey</span></div>
+            <label class="sw"><input type="checkbox" id="t_colorfix"><span class="sl"></span></label>
+          </div>
         </div>
       </details>
 
@@ -427,6 +431,7 @@ function collectOptions(){
   o.cta=$('t_cta').checked;
   if($('t_cta').checked){o.cta_business=$('ctaBiz').value;o.cta_phone=$('ctaPhone').value;}
   o.silence_threshold_db=parseInt($('s_sil').value,10);
+  o.color_fix=$('t_colorfix').checked;
   return o;
 }
 

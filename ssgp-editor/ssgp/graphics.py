@@ -135,20 +135,8 @@ def plan(words: Sequence[Word], knowledge: Dict, gfx: dict) -> Dict:
             if matched:
                 continue
 
-            # "number one/two/three" or a bare ordinal -> a number badge
-            if norm == "number" and i + 1 < len(wl):
-                nxt = wl[i + 1].text.lower().strip(".,!?")
-                dig = nxt if nxt.isdigit() else _NUM_WORD.get(nxt)
-                if dig:
-                    pops.append({"start": wl[i].start, "end": wl[i + 1].end,
-                                 "text": dig, "kind": "badge", "score": 4})
-                    i += 2
-                    continue
-            if low in _ORDINAL:
-                pops.append({"start": wl[i].start, "end": wl[i].end,
-                             "text": _ORDINAL[low], "kind": "badge", "score": 4})
-                i += 1
-                continue
+            # (Number badges intentionally disabled — they felt gimmicky. The
+            #  spoken "number one/two" still reads fine in the captions.)
 
             # price / number
             if re.search(r"\d", raw) and not re.fullmatch(r"[a-z]+", low):

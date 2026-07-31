@@ -74,6 +74,7 @@ _FLAT_MAP = {
     "height": ("output", "height"),
     "fps": ("output", "fps"),
     "reframe": ("output", "reframe"),
+    "color_fix": ("output", "color_fix"),
     "max_speed": ("output", "max_speed"),
     "crop_x": ("output", "crop_x"),
     "crop_y": ("output", "crop_y"),

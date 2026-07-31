@@ -33,6 +33,7 @@ from .config import resolve_path
 from .ffmpeg_utils import (
     SDR_TAGS,
     ProbeInfo,
+    color_tags,
     ensure_ffmpeg,
     hdr_to_sdr_prefilter,
     hdr_quality,
@@ -189,9 +190,14 @@ def render_video(
     # ---- 5) style the FULL clip: reframe + zoom + captions + watermark -----
     progress(48, "video")
     styled_full = str(work / "styled_full.mp4")
-    color_prefix = hdr_to_sdr_prefilter(info)  # HDR iPhone footage -> SDR (fixes grey/washed look)
+    # Colour: OFF by default so the render keeps the clip's original colour (no
+    # "filter"). Only tone-map HDR->SDR when explicitly asked (output.color_fix).
+    color_prefix = hdr_to_sdr_prefilter(info) if out.get("color_fix", False) else ""
     applied["hdr_tonemapped"] = bool(color_prefix)
-    applied["hdr_quality"] = hdr_quality(info)  # "", "proper", or "approx"
+    applied["hdr_quality"] = hdr_quality(info) if out.get("color_fix", False) else ""
+    # When we didn't tone-map, mirror the source's colour tags so the output
+    # looks identical to the original instead of a forced BT.709 conversion.
+    cfg["_color_tags"] = color_tags(info, bool(color_prefix))
     _video_pass(source_path, styled_full, cfg, W, H, FPS, src_duration,
                 [(0.0, src_duration)], caption_list, fonts_dir, work, log_path, color_prefix,
                 graphics_list)
@@ -366,7 +372,7 @@ def _apply_cuts_av(video_src: str, audio_src: str, dst: str, keeps: Sequence[Seg
         "ffmpeg", "-y", *inputs, "-filter_complex", fc, *maps,
         "-c:v", o.get("video_codec", "libx264"), "-crf", str(o.get("crf", 20)),
         "-preset", o.get("preset", "medium"), "-pix_fmt", o.get("pixel_format", "yuv420p"),
-        *SDR_TAGS, "-r", str(fps),
+        *cfg.get("_color_tags", SDR_TAGS), "-r", str(fps),
     ]
     if has_audio:
         cmd += ["-c:a", "aac", "-b:a", o.get("audio_bitrate", "192k")]
@@ -464,7 +470,7 @@ def _video_pass(src, dst, cfg, W, H, FPS, duration, keeps, caption_list, fonts_d
         "ffmpeg", "-y", *inputs, "-filter_complex", fc, "-map", f"[{last}]", "-an",
         "-c:v", o.get("video_codec", "libx264"), "-crf", str(o.get("crf", 20)),
         "-preset", o.get("preset", "medium"), "-pix_fmt", o.get("pixel_format", "yuv420p"),
-        *SDR_TAGS, "-r", str(FPS), "-t", f"{duration:.3f}", dst,
+        *cfg.get("_color_tags", SDR_TAGS), "-r", str(FPS), "-t", f"{duration:.3f}", dst,
     ], log_path)
 
 
@@ -591,7 +597,7 @@ def _build_cta_card(dst, cfg, W, H, FPS, fonts_dir, work, log_path):
         "-t", f"{dur}",
         "-c:v", o.get("video_codec", "libx264"), "-crf", str(o.get("crf", 20)),
         "-preset", o.get("preset", "medium"), "-pix_fmt", o.get("pixel_format", "yuv420p"),
-        *SDR_TAGS, "-c:a", "aac", "-b:a", "128k", "-r", str(FPS), dst,
+        *cfg.get("_color_tags", SDR_TAGS), "-c:a", "aac", "-b:a", "128k", "-r", str(FPS), dst,
     ], log_path)
 
 
@@ -612,7 +618,7 @@ def _concat_finalise(parts: Sequence[str], out_path: str, cfg, log_path):
         "-map", "[v]", "-map", "[a]",
         "-c:v", o.get("video_codec", "libx264"), "-crf", str(o.get("crf", 20)),
         "-preset", o.get("preset", "medium"), "-pix_fmt", o.get("pixel_format", "yuv420p"),
-        *SDR_TAGS, "-c:a", "aac", "-b:a", o.get("audio_bitrate", "192k"), *movflags, out_path,
+        *cfg.get("_color_tags", SDR_TAGS), "-c:a", "aac", "-b:a", o.get("audio_bitrate", "192k"), *movflags, out_path,
     ], log_path)
 
 
@@ -625,7 +631,7 @@ def _apply_speed(src: str, dst: str, sf: float, cfg, FPS: int, log_path):
         "ffmpeg", "-y", "-i", src, "-filter_complex", fc, "-map", "[v]", "-map", "[a]",
         "-c:v", o.get("video_codec", "libx264"), "-crf", str(o.get("crf", 20)),
         "-preset", o.get("preset", "medium"), "-pix_fmt", o.get("pixel_format", "yuv420p"),
-        *SDR_TAGS, "-c:a", "aac", "-b:a", o.get("audio_bitrate", "192k"), "-r", str(FPS), dst,
+        *cfg.get("_color_tags", SDR_TAGS), "-c:a", "aac", "-b:a", o.get("audio_bitrate", "192k"), "-r", str(FPS), dst,
     ], log_path)
 
 

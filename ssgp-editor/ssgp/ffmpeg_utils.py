@@ -128,9 +128,31 @@ def hdr_to_sdr_prefilter(info: "ProbeInfo") -> str:
             "format=yuv420p,")
 
 
-# SDR BT.709 output tags — set on every encode so players never misread the file
+# SDR BT.709 output tags — used when we've actually tone-mapped to SDR
 SDR_TAGS = ["-colorspace", "bt709", "-color_primaries", "bt709",
             "-color_trc", "bt709", "-color_range", "tv"]
+
+
+def color_tags(info: "ProbeInfo", tonemapped: bool) -> list:
+    """Colour metadata to stamp on the output.
+
+    If we tone-mapped HDR->SDR, tag it BT.709. Otherwise we did NOT touch the
+    colour, so mirror the SOURCE's own tags — this makes the render look exactly
+    like the original clip instead of a forced conversion (no "grey filter").
+    Falls back to BT.709 for ordinary SDR footage with no metadata."""
+    if tonemapped:
+        return list(SDR_TAGS)
+    tags: list = []
+    if info.color_space:
+        tags += ["-colorspace", info.color_space]
+    if info.color_primaries:
+        tags += ["-color_primaries", info.color_primaries]
+    if info.color_transfer:
+        tags += ["-color_trc", info.color_transfer]
+    if tags:
+        tags += ["-color_range", "tv"]
+        return tags
+    return list(SDR_TAGS)
 
 
 def probe(path: str) -> ProbeInfo:
