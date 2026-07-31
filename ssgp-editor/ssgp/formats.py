@@ -28,7 +28,7 @@ _SHORT: Dict = {
     "captions": {"enabled": True, "mode": "dynamic"},
     "graphics": {"enabled": True},
     "zoom": {"enabled": True, "intensity": 0.06, "punch_on_cuts": False},
-    "music": {"enabled": True, "volume": 0.18},
+    "music": {"enabled": True, "volume": 0.18, "voice_lufs": -16},
 }
 
 _LONG: Dict = {
@@ -42,7 +42,7 @@ _LONG: Dict = {
     "captions": {"enabled": False, "mode": "clean"},
     "graphics": {"enabled": False},
     "zoom": {"enabled": True, "intensity": 0.03, "punch_on_cuts": False},
-    "music": {"enabled": True, "volume": 0.12},
+    "music": {"enabled": True, "volume": 0.12, "voice_lufs": -14},
 }
 
 

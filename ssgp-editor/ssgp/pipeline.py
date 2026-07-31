@@ -288,6 +288,7 @@ def render_video(
     audio_path = str(work / "audio.m4a")
     music_used = _audio_pass(cut_path, audio_path, cfg, cut_duration, info.has_audio, work, job_id, log_path)
     applied["music"] = music_used
+    applied["audio_cleaned"] = bool(info.has_audio)
 
     # ---- 9) mux + optional CTA + finalise ----------------------------------
     progress(94, "mux")
@@ -467,8 +468,28 @@ def _video_pass(src, dst, cfg, W, H, FPS, duration, keeps, caption_list, fonts_d
     ], log_path)
 
 
+def _voice_clean_chain(m: dict) -> str:
+    """Clean up the spoken track: roll off low-end rumble/handling noise, optional
+    de-noise, then normalise loudness so every clip sits at a consistent, online-
+    ready level with headroom (no clipping)."""
+    parts: List[str] = []
+    if m.get("voice_highpass", True):
+        parts.append("highpass=f=90")
+    if m.get("voice_denoise", False):
+        parts.append("afftdn=nf=-25")
+    lufs = float(m.get("voice_lufs", -16))
+    parts.append(f"loudnorm=I={lufs:.1f}:TP=-1.5:LRA=11")
+    return ",".join(parts)
+
+
+def _duck_ratio(m: dict) -> float:
+    """Turn the desired 'music sits N dB under speech' into a sidechain ratio."""
+    duck_db = abs(float(m.get("duck_under_speech_db", -18)))
+    return max(6.0, min(20.0, duck_db / 1.5))
+
+
 def _audio_pass(cut_path, dst, cfg, duration, has_voice, work, job_id, log_path) -> Optional[str]:
-    """Produce the final audio: voice + music bed ducked under the voice."""
+    """Produce the final audio: cleaned voice + music bed ducked under the voice."""
     m = cfg["music"]
     music_path = None
     if m.get("enabled"):
@@ -503,14 +524,17 @@ def _audio_pass(cut_path, dst, cfg, duration, has_voice, work, job_id, log_path)
         ], log_path)
         return os.path.basename(music_path) + " (voice removed)" if replace_voice else os.path.basename(music_path)
 
-    # Case A: voice + music -> duck music under voice, then mix
+    # Case A: voice + music -> clean voice, duck music under it, then mix
     if has_voice and music_path:
         fade_out_st = max(0.0, dur - fo)
+        clean = _voice_clean_chain(m)
+        ratio = _duck_ratio(m)
         fc = (
+            f"[0:a]{clean},asplit=2[vk][vm];"
             f"[1:a]atrim=0:{dur:.3f},asetpts=PTS-STARTPTS,volume={vol},"
             f"afade=t=in:st=0:d={fi},afade=t=out:st={fade_out_st:.3f}:d={fo}[m];"
-            f"[m][0:a]sidechaincompress=threshold=0.03:ratio=12:attack={atk}:release={rel}:makeup=1[mc];"
-            f"[0:a][mc]amix=inputs=2:duration=first:normalize=0[a]"
+            f"[m][vk]sidechaincompress=threshold=0.03:ratio={ratio:.1f}:attack={atk}:release={rel}:makeup=1[mc];"
+            f"[vm][mc]amix=inputs=2:duration=first:normalize=0[a]"
         )
         run([
             "ffmpeg", "-y", "-i", cut_path, "-stream_loop", "-1", "-i", music_path,
@@ -519,10 +543,12 @@ def _audio_pass(cut_path, dst, cfg, duration, has_voice, work, job_id, log_path)
         ], log_path)
         return os.path.basename(music_path)
 
-    # Case B: voice only
+    # Case B: voice only -> clean + loudness-normalise
     if has_voice:
+        clean = _voice_clean_chain(m)
         run([
-            "ffmpeg", "-y", "-i", cut_path, "-vn", "-t", f"{dur:.3f}",
+            "ffmpeg", "-y", "-i", cut_path, "-filter_complex", f"[0:a]{clean}[a]",
+            "-map", "[a]", "-t", f"{dur:.3f}",
             "-c:a", "aac", "-b:a", cfg["output"].get("audio_bitrate", "192k"), dst,
         ], log_path)
         return None

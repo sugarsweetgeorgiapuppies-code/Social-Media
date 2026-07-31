@@ -157,9 +157,14 @@ music:
   replace_voice: false       # true = remove the person's voice and play ONLY music over the video
                              #        (captions are still generated from what was said)
   solo_volume: 0.85          # music level when it's the only audio (replace_voice or silent source)
-  duck_under_speech_db: -18  # music is pushed at least this far under the voice while Phil talks
+  duck_under_speech_db: -18  # how far below the voice the music sits while Phil talks
+                             # (drives the sidechain ducking strength; -18 subtle, -22 strong)
   duck_attack: 5             # ms — how fast music drops when speech starts
   duck_release: 300          # ms — how fast music comes back when speech stops
+  # --- voice cleanup (applied to the spoken track before mixing) ---
+  voice_highpass: true       # roll off low rumble / handling noise below ~90Hz
+  voice_denoise: false       # background-noise reduction (afftdn); cleaner, but can sound processed
+  voice_lufs: -16            # normalise voice loudness to this LUFS (online-video standard, w/ headroom)
   fade_in: 0.5               # seconds
   fade_out: 0.8              # seconds
 

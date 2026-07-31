@@ -179,6 +179,8 @@ def summarize(applied: dict, cfg: dict) -> List[str]:
     if applied.get("corrections"):
         out.append(f"Fixed {len(applied['corrections'])} misheard word(s).")
 
+    if applied.get("audio_cleaned"):
+        out.append("Cleaned up the audio — leveled the voice and rolled off low rumble.")
     music = applied.get("music")
     if music:
         out.append(f"Laid in background music ({music}), ducked under the voice.")
