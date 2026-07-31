@@ -129,6 +129,16 @@ def _rgba(hexs: str, alpha: float = 1.0) -> Tuple[int, int, int, int]:
     return (r, g, b, max(0, min(255, int(round(alpha * 255)))))
 
 
+_REFERENCE_W = 1080  # all px sizes are authored against a 1080-wide canvas
+
+
+def text_scale(W: int) -> float:
+    """Scale factor so text keeps the same on-screen proportion on any canvas
+    width (1.0 at 1080 wide -> unchanged short-form; ~1.78 at 1920 wide so 16:9
+    isn't rendered half-size)."""
+    return max(0.5, float(W) / _REFERENCE_W)
+
+
 def _font(fonts_dir: Path, weight: int, size: int) -> ImageFont.FreeTypeFont:
     fname = _WEIGHT_FILE.get(int(weight), "Montserrat-ExtraBold.ttf")
     path = fonts_dir / fname
@@ -150,8 +160,9 @@ def _draw_caption_frame(
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
+    s = text_scale(W)
     uppercase = bool(cap.get("uppercase", False))
-    base_size = int(cap.get("font_size", 78))
+    base_size = int(cap.get("font_size", 78) * s)
     hi_scale = float(cap.get("highlight_scale", 1.14))
     active_size = int(round(base_size * hi_scale))
     weight = int(cap.get("font_weight", 800))
@@ -161,7 +172,7 @@ def _draw_caption_frame(
     fill = _rgba(cap.get("fill_color", "#ffffff"))
     stroke = _rgba(cap.get("stroke_color", "#1a1a1a"))
     highlight = _rgba(cap.get("highlight_color", "#ffd24a"))
-    stroke_w = int(cap.get("stroke_width", 6))
+    stroke_w = max(1, int(cap.get("stroke_width", 6) * s))
 
     def text_of(w: Word) -> str:
         return w.text.upper() if uppercase else w.text
@@ -213,17 +224,29 @@ def build_caption_track(
 
     lines = group_lines(words, int(cap.get("max_chars_per_line", 22)), float(cap.get("line_pause", 0.7)))
 
-    # Build (absolute_time, image) events. A line shows word-by-word (each word
-    # highlighted at its own start), then blanks at the line's end.
+    # "clean" captions (and long-form) render ONE still image per line instead of
+    # one per word — no active-word highlight, and far fewer PNGs on long videos.
+    per_line = str(cap.get("render_granularity") or
+                   ("per_line" if cap.get("mode") == "clean" else "per_word")) == "per_line"
+
+    # Build (absolute_time, image) events. Per-word: each word highlighted at its
+    # own start. Per-line: the whole line appears at once. Then blank at line end.
     events: List[Tuple[float, str]] = [(0.0, transparent)]
     n = 0
     for line in lines:
-        for i, w in enumerate(line):
-            frame = _draw_caption_frame(line, i, cap, fonts_dir, W, H)
+        if per_line:
+            frame = _draw_caption_frame(line, -1, cap, fonts_dir, W, H)  # -1 = no highlight
             fp = cap_dir / f"s{n:04d}.png"
             frame.save(fp)
-            events.append((max(0.0, float(w.start)), str(fp.resolve())))
+            events.append((max(0.0, float(line[0].start)), str(fp.resolve())))
             n += 1
+        else:
+            for i, w in enumerate(line):
+                frame = _draw_caption_frame(line, i, cap, fonts_dir, W, H)
+                fp = cap_dir / f"s{n:04d}.png"
+                frame.save(fp)
+                events.append((max(0.0, float(w.start)), str(fp.resolve())))
+                n += 1
         events.append((float(line[-1].end) + 0.10, transparent))  # blank after the line
 
     # Sort by time and enforce strictly-increasing timeline. When two states are
@@ -271,13 +294,14 @@ def render_watermark(wm: dict, fonts_dir: Path, W: int, H: int, out_png: Path) -
         img.alpha_composite(logo, pos)
     elif wm.get("text"):
         draw = ImageDraw.Draw(img)
+        s = text_scale(W)
         opacity = float(wm.get("opacity", 0.88))
-        font = _font(fonts_dir, int(wm.get("font_weight", 700)), int(wm.get("font_size", 34)))
+        font = _font(fonts_dir, int(wm.get("font_weight", 700)), int(wm.get("font_size", 34) * s))
         fill = _rgba(wm.get("fill_color", "#ffffff"), opacity)
         stroke = _rgba(wm.get("stroke_color", "#1a1a1a"), opacity)
         y = int(float(wm.get("position_y_pct", 0.045)) * H)
         draw.text((W / 2.0, y), str(wm["text"]), font=font, fill=fill, anchor="ma",
-                  stroke_width=int(wm.get("stroke_width", 2)), stroke_fill=stroke)
+                  stroke_width=max(1, int(wm.get("stroke_width", 2) * s)), stroke_fill=stroke)
     img.save(out_png)
     return str(out_png)
 
@@ -294,6 +318,7 @@ def render_cta_card(cta: dict, fonts_dir: Path, W: int, H: int, out_png: Path) -
     img = Image.new("RGB", (W, H), bg)
     draw = ImageDraw.Draw(img)
     weight = int(cta.get("font_weight", 800))
+    s = text_scale(W)
 
     def fit(text: str, size: int, max_frac: float = 0.86) -> ImageFont.FreeTypeFont:
         f = _font(fonts_dir, weight, size)
@@ -324,16 +349,16 @@ def render_cta_card(cta: dict, fonts_dir: Path, W: int, H: int, out_png: Path) -
     phone = str(cta.get("phone") or "")
 
     if tagline:
-        center(tagline, int(cta.get("tagline_size", 50)), cta.get("muted_color", "#bcd3e6"), y)
+        center(tagline, int(cta.get("tagline_size", 50) * s), cta.get("muted_color", "#bcd3e6"), y)
         y += H * 0.075
-    center(name, int(cta.get("name_size", 68)), cta.get("title_color", "#ffffff"), y + H * 0.02)
+    center(name, int(cta.get("name_size", 68) * s), cta.get("title_color", "#ffffff"), y + H * 0.02)
     y += H * 0.095
-    center(location, int(cta.get("location_size", 46)), cta.get("muted_color", "#bcd3e6"), y)
+    center(location, int(cta.get("location_size", 46) * s), cta.get("muted_color", "#bcd3e6"), y)
     y += H * 0.085
 
     # --- phone as a bright tap-to-call pill (the focus) ---
     if phone:
-        f = fit(phone, int(cta.get("phone_size", 82)), max_frac=0.7)
+        f = fit(phone, int(cta.get("phone_size", 82) * s), max_frac=0.7)
         tw = f.getlength(phone)
         try:
             asc, desc = f.getmetrics()

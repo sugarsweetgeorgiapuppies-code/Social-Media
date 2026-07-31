@@ -21,7 +21,7 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple
 from PIL import Image, ImageDraw, ImageFont
 
 from .knowledge import _norm
-from .textrender import _font, _rgb, _rgba
+from .textrender import _font, _rgb, _rgba, text_scale
 from .transcribe import Word
 
 # words that deserve a call-out even if they aren't in the knowledge base
@@ -219,8 +219,9 @@ def _fit(fonts_dir: Path, weight: int, text: str, size: int, W: int, max_frac: f
 def _draw_hook(img: "Image.Image", text: str, gfx: dict, fonts_dir: Path, W: int, H: int) -> None:
     draw = ImageDraw.Draw(img, "RGBA")
     weight = 800
+    s = text_scale(W)
     lines = _wrap(text, int(gfx.get("hook_wrap", 15)))
-    size = int(gfx.get("hook_size", 92))
+    size = int(gfx.get("hook_size", 92) * s)
     font = lines and _fit(fonts_dir, weight, max(lines, key=len), size, W, 0.82) or _font(fonts_dir, weight, size)
     asc, desc = font.getmetrics()
     lh = int((asc + desc) * 1.06)
@@ -240,7 +241,7 @@ def _draw_hook(img: "Image.Image", text: str, gfx: dict, fonts_dir: Path, W: int
     y = top
     for ln in lines:
         draw.text((W / 2, y), ln, font=font, fill=fill, anchor="ma",
-                  stroke_width=int(gfx.get("hook_stroke", 5)), stroke_fill=stroke)
+                  stroke_width=max(1, int(gfx.get("hook_stroke", 5) * s)), stroke_fill=stroke)
         y += lh
 
 
@@ -248,28 +249,31 @@ def _draw_pop(img: "Image.Image", text: str, kind: str, scale: float,
               gfx: dict, fonts_dir: Path, W: int, H: int) -> None:
     draw = ImageDraw.Draw(img, "RGBA")
     weight = 800
+    s = text_scale(W) * scale
     cy = float(gfx.get("pop_pos_pct", 0.42)) * H
 
     if kind == "badge":
         # a big number in a brand circle
-        base = int(gfx.get("badge_size", 150) * scale)
+        base = int(gfx.get("badge_size", 150) * s)
         r = base // 2
         cx = W / 2
         draw.ellipse([cx - r, cy - r, cx + r, cy + r],
                      fill=_rgb(gfx.get("pop_color", "#ffd23f")),
-                     outline=_rgb(gfx.get("pop_stroke", "#12263a")), width=int(base * 0.06))
+                     outline=_rgb(gfx.get("pop_stroke", "#12263a")), width=max(1, int(base * 0.06)))
         f = _font(fonts_dir, weight, int(base * 0.62))
         draw.text((cx, cy), text, font=f, fill=_rgb(gfx.get("pop_stroke", "#12263a")), anchor="mm")
         return
 
     disp = text.upper() if gfx.get("pop_uppercase", True) else text
-    size = int(gfx.get("pop_size", 104) * scale)
+    size = int(gfx.get("pop_size", 104) * s)
     f = _fit(fonts_dir, weight, disp, size, W, 0.88)
+    stroke_w = max(1, int(gfx.get("pop_stroke_w", 8) * text_scale(W)))
+    off = max(2, int(4 * text_scale(W)))
     # soft shadow then the word
-    draw.text((W / 2 + 4, cy + 5), disp, font=f, fill=(0, 0, 0, 120), anchor="mm",
-              stroke_width=int(gfx.get("pop_stroke_w", 8)), stroke_fill=(0, 0, 0, 120))
+    draw.text((W / 2 + off, cy + off), disp, font=f, fill=(0, 0, 0, 120), anchor="mm",
+              stroke_width=stroke_w, stroke_fill=(0, 0, 0, 120))
     draw.text((W / 2, cy), disp, font=f, fill=_rgb(gfx.get("pop_color", "#ffd23f")), anchor="mm",
-              stroke_width=int(gfx.get("pop_stroke_w", 8)), stroke_fill=_rgb(gfx.get("pop_stroke", "#12263a")))
+              stroke_width=stroke_w, stroke_fill=_rgb(gfx.get("pop_stroke", "#12263a")))
 
 
 # ---------------------------------------------------------------------------
