@@ -84,7 +84,7 @@ def _ai_hook(transcript: str) -> Optional[str]:
         client = anthropic.Anthropic()
         msg = client.messages.create(
             model="claude-sonnet-5",
-            max_tokens=40,
+            max_tokens=220,
             system=("Write a punchy 2-5 word on-screen HOOK for a puppy-store "
                     "Reel from the transcript. Title Case, no quotes, no emoji, "
                     "no period. Just the hook."),

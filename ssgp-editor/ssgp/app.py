@@ -145,7 +145,10 @@ async def render_status(job_id: str):
 @app.get("/api/config")
 async def api_config():
     """Expose the current defaults so the UI can populate its controls."""
-    return load_config()
+    cfg = load_config()
+    from . import smartcut
+    cfg["ai_editing_available"] = smartcut.available(cfg.get("cuts", {}))
+    return cfg
 
 
 @app.get("/api/music")

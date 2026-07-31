@@ -150,11 +150,17 @@ def summarize(applied: dict, cfg: dict) -> List[str]:
     elif rf in ("cover_center", "cover_at"):
         out.append("Reframed to fill the vertical frame.")
 
+    if applied.get("ai_editing"):
+        out.append("AI editor read the transcript and edited to match your description.")
     if applied.get("intro_trimmed"):
         out.append("Cut the weak intro so it opens on the real content.")
     sc = applied.get("smart_cut")
     if isinstance(sc, dict) and sc.get("removed"):
-        out.append(f"Removed {len(sc['removed'])} spoken mistake(s)/tangent(s).")
+        reasons = [r for r in (sc.get("reasons") or []) if r][:3]
+        line = f"Cut {len(sc['removed'])} part(s) the AI judged weak"
+        if reasons:
+            line += ": " + "; ".join(reasons)
+        out.append(line + ".")
     sil = applied.get("silences_found")
     if sil:
         out.append(f"Tightened {sil} silent gap(s) / dead air.")

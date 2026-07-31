@@ -35,6 +35,17 @@ def _api_key(cfg_cuts: dict) -> str:
     return os.environ.get("ANTHROPIC_API_KEY") or cfg_cuts.get("anthropic_api_key") or ""
 
 
+def available(cfg_cuts: dict) -> bool:
+    """True when the AI editor can actually run (key present + package installed)."""
+    if not _api_key(cfg_cuts):
+        return False
+    try:
+        import anthropic  # noqa: F401
+    except Exception:
+        return False
+    return True
+
+
 def _transcript_lines(words: Sequence[Word]) -> str:
     """Compact, timestamped transcript for the model to reason over."""
     lines = []
@@ -43,8 +54,10 @@ def _transcript_lines(words: Sequence[Word]) -> str:
     return "\n".join(lines)
 
 
-def plan_removals(words: Sequence[Word], cfg_cuts: dict) -> dict:
-    """Ask Claude which ranges to cut.
+def plan_removals(words: Sequence[Word], cfg_cuts: dict,
+                  user_instruction: str = "", fmt: str = "short") -> dict:
+    """Ask Claude which ranges to cut, guided by good-editing principles AND the
+    user's own plain-English request.
 
     Returns a dict so the caller can SHOW what happened (no more silent
     no-ops):
@@ -68,19 +81,37 @@ def plan_removals(words: Sequence[Word], cfg_cuts: dict) -> dict:
     model = cfg_cuts.get("smart_cut_model") or "claude-sonnet-5"
     transcript = _transcript_lines(words)
 
+    # format-aware editing philosophy
+    if str(fmt).lower() == "long":
+        philosophy = ("This is a LONG-FORM video. Preserve the natural flow and the full "
+                      "story. Remove ONLY clear mistakes, false starts, repeated takes and "
+                      "genuinely dead/off-topic stretches. Do NOT tighten aggressively and "
+                      "do not remove normal pauses.")
+    else:
+        philosophy = ("This is a SHORT-FORM video for social media. Be decisive: keep only "
+                      "the strongest, most engaging, on-message content. Cut weak intros, "
+                      "rambling, repetition, filler and anything that isn't pulling its "
+                      "weight, so the result is punchy and hooks fast.")
+
+    user_block = ""
+    if user_instruction.strip():
+        user_block = ("\n\nThe user's specific request for THIS video (follow it closely "
+                      "when deciding what to keep and cut):\n\"" + user_instruction.strip() + "\"")
+
     system = (
-        "You are a short-form video editor. You are given a word-level transcript "
-        "with [start-end] timestamps in seconds. Decide which time ranges to CUT so "
-        "the final clip is tight and clean. " + instructions + "\n\n"
-        "Respond with ONLY a JSON array of objects {\"start\": number, \"end\": "
-        "number, \"reason\": string}, timestamps in seconds, no prose. Empty array "
-        "if nothing should be cut."
+        "You are an expert video editor. You are given a word-level transcript with "
+        "[start-end] timestamps in seconds. Decide which time ranges to CUT so the "
+        "final video is exactly what it should be. " + philosophy + " " + instructions +
+        user_block + "\n\n"
+        "Return ONLY a JSON array of objects {\"start\": number, \"end\": number, "
+        "\"reason\": short string}, timestamps in seconds, no prose. Never cut in a way "
+        "that clips a word mid-sentence. Empty array if nothing should be cut."
     )
 
     try:
         client = anthropic.Anthropic(api_key=key)
         msg = client.messages.create(
-            model=model, max_tokens=1500, system=system,
+            model=model, max_tokens=3000, system=system,
             messages=[{"role": "user", "content": transcript}],
         )
         raw = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")

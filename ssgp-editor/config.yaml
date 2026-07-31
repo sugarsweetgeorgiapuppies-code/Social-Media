@@ -52,7 +52,8 @@ cuts:
   # --- AI smart-cut: removes SPOKEN mistakes (false starts, "I forgot the
   #     script", retakes, off-topic tangents) that silence-cutting can't catch.
   #     Needs an Anthropic API key. Off by default. ---
-  smart_cut: false
+  smart_cut: null             # null = AUTO (the AI editor runs whenever an API key is
+                              # available); true = force on; false = force off
   anthropic_api_key: null     # or set the ANTHROPIC_API_KEY environment variable instead
   smart_cut_model: claude-sonnet-5
   smart_cut_instructions: null  # null = sensible default; or describe what to cut in plain English

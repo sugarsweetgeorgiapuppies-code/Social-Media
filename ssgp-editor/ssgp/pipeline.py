@@ -61,6 +61,7 @@ def render_video(
     progress: Optional[ProgressCb] = None,
     log_path: Optional[str] = None,
     job_id: str = "job",
+    user_instruction: str = "",
 ) -> dict:
     """Render ``source_path`` into a finished vertical MP4 at ``out_path``.
 
@@ -224,9 +225,14 @@ def render_video(
         keeps = silence_mod.snap_segments_to_words(keeps, words)
         applied["silences_found"] = len(silences)
 
-        if c.get("smart_cut"):
-            progress(74, "smart-cut")
-            sc = smartcut.plan_removals(words, c)
+        # AI editor: runs automatically whenever an API key is available (unless
+        # explicitly turned off), and it now follows the user's own instruction.
+        ai_on = smartcut.available(c)
+        applied["ai_editing"] = ai_on
+        run_smart = bool(c.get("smart_cut")) or (ai_on and c.get("smart_cut") is not False)
+        if run_smart:
+            progress(74, "ai-edit")
+            sc = smartcut.plan_removals(words, c, user_instruction, cfg.get("format", "short"))
             removals = sc.get("removals", [])
             if removals:
                 keeps = silence_mod.subtract_ranges(keeps, removals, float(c.get("min_segment", 0.2)))

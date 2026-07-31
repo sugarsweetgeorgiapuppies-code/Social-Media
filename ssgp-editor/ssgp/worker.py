@@ -130,6 +130,7 @@ class RenderWorker:
         applied = render_video(
             source, out_path, cfg, str(job_work),
             progress=progress, log_path=log_path, job_id=job_id,
+            user_instruction=job.instructions or "",
         )
 
         self.store.update(

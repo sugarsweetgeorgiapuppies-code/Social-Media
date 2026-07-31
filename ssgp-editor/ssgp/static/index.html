@@ -136,6 +136,7 @@
     <h1>SSGP Editor</h1>
     <div class="sub">Sugar Sweet Georgia Puppies</div>
   </header>
+  <div id="aiBanner" style="display:none;border-radius:12px;padding:11px 14px;margin-bottom:16px;font-size:12.5px;border:1px solid var(--line)"></div>
 
   <div class="grid">
     <!-- ============ LEFT: workflow ============ -->
@@ -410,6 +411,14 @@ fetch('/api/config').then(r=>r.json()).then(c=>{try{
   $('s_sil').value=c.cuts.silence_threshold_db;$('s_sil').dispatchEvent(new Event('input'));
   $('model').value=c.captions.model||'small';
   $('ctaBiz').value=c.cta.business||'';$('ctaPhone').value=c.cta.phone||'';
+  const b=$('aiBanner');
+  if(c.ai_editing_available){
+    b.style.display='block';b.style.borderColor='#1e5a3a';b.style.background='#0f2a1e';
+    b.innerHTML='<b style="color:var(--ok)">AI editing is ON.</b> It reads what’s said and edits to match your description — cutting mistakes, weak intros and rambling.';
+  }else{
+    b.style.display='block';b.style.borderColor='#5a4a1e';b.style.background='#2a2410';
+    b.innerHTML='<b style="color:var(--yellow)">AI editing is OFF.</b> Right now it only trims silences. To make it actually understand and edit your video, set your Anthropic API key before starting the app:<br><code style="color:var(--text)">export ANTHROPIC_API_KEY=sk-ant-…</code> then <code style="color:var(--text)">python3 run.py</code>';
+  }
 }catch(e){}}).catch(()=>{});
 
 /* ---------- build options ---------- */
