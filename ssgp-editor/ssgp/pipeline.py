@@ -26,6 +26,7 @@ from . import music as music_mod
 from . import silence as silence_mod
 from . import smartcut
 from . import graphics as graphics_mod
+from . import plan as plan_mod
 from . import reframe
 from . import textrender
 from .config import resolve_path
@@ -149,6 +150,19 @@ def render_video(
     if words:
         applied["transcript"] = " ".join(w.text for w in words)
 
+    # ---- 3b) EDIT PLAN: decide the edit before any pixels are rendered ------
+    # Chooses the opening, a hook, and extra removals (weak intro / mistakes).
+    # It only writes into settings the pipeline already consumes, so plan and
+    # render stay in lockstep; a failure here just leaves the deterministic path.
+    fmt = cfg.get("format", "short")
+    edit_plan = plan_mod.build_edit_plan(fmt, words, cfg) if words else \
+        {"opening_strategy": "chronological", "removals": [], "headline": None, "notes": []}
+    if edit_plan.get("headline") and cfg.get("graphics", {}).get("enabled", True) \
+            and not cfg.get("graphics", {}).get("headline"):
+        cfg.setdefault("graphics", {})["headline"] = edit_plan["headline"]
+    applied["edit_plan"] = {"opening": edit_plan.get("opening_strategy"),
+                            "notes": edit_plan.get("notes", [])}
+
     # ---- 4) captions overlay track (ORIGINAL timeline) ---------------------
     # Captions are burned onto the FULL clip BEFORE any cutting, so they become
     # part of the frames and get cut in lockstep with the video — they can
@@ -227,6 +241,15 @@ def render_video(
         applied["dog_cut"] = {"status": dc.get("status"), "detail": dc.get("detail"),
                               "removed": [[round(s, 2), round(e, 2)] for s, e in dremovals]}
 
+    # Edit-plan removals (weak intro, AI-found mistakes) — applied when cutting.
+    plan_removals = [(float(s), float(e)) for (s, e, *_rest) in edit_plan.get("removals", [])]
+    if want_cuts and plan_removals:
+        keeps = silence_mod.subtract_ranges(keeps, plan_removals, float(c.get("min_segment", 0.2)))
+        if any(k == "weak_intro" for (_s, _e, k, *_r) in edit_plan["removals"]):
+            applied["intro_trimmed"] = True
+        applied["plan_removals"] = [[round(s, 2), round(e, 2), k]
+                                    for (s, e, k, *_r) in edit_plan["removals"]]
+
     applied["segments_kept"] = len(keeps)
 
     cut_duration = silence_mod.total_kept_duration(keeps)
@@ -300,6 +323,9 @@ def render_video(
     else:
         _finalise_copy(body, out_path, cfg, log_path)
         applied["cta"] = False
+
+    # "What I did" — human-readable decisions, built from what actually happened
+    applied["decisions"] = plan_mod.summarize(applied, cfg)
 
     progress(100, "done")
     return applied

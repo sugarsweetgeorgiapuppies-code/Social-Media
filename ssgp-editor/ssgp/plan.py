@@ -1,0 +1,189 @@
+"""The edit plan — the editor's brain.
+
+Before a single frame is rendered, this module looks at the transcript and the
+chosen format and makes editorial decisions: what the opening should be, which
+weak/dead parts to drop, and a plain-English list of what it did (surfaced to
+the user as the "What I did" summary). It writes ONLY into settings the render
+pipeline already consumes, so the plan and the render can never drift, and if
+anything here fails the pipeline still falls back to its deterministic path.
+
+Two levels:
+- rule-based (always on, no network): weak-intro trim, opening strategy,
+  the decisions summary.
+- optional Claude pass (when ANTHROPIC_API_KEY is set): a richer opening choice
+  + extra removals with reasons. Guarded; failure degrades to the rules.
+"""
+
+from __future__ import annotations
+
+import os
+import re
+from typing import Dict, List, Optional, Sequence, Tuple
+
+from .transcribe import Word
+
+Segment = Tuple[float, float]
+
+# Greeting / filler that a strong short-form open should skip.
+_FILLER = {
+    "hi", "hey", "hello", "yo", "hiya", "heya", "sup", "guys", "everyone",
+    "everybody", "y'all", "yall", "folks", "um", "uh", "erm", "so", "okay",
+    "ok", "alright", "alrighty", "well", "welcome", "back", "whats", "what's",
+    "how", "are", "you", "doing", "today", "basically", "just", "wanna",
+    "gonna", "like", "yeah",
+}
+# words that signal real content has started (never treat as filler)
+_STRONG_HINT = re.compile(r"\d|\$|%")
+
+
+def _norm(t: str) -> str:
+    return re.sub(r"[^a-z0-9']", "", t.lower())
+
+
+def find_weak_intro(words: Sequence[Word], max_seconds: float = 5.0,
+                    max_words: int = 8) -> Optional[Segment]:
+    """If the clip opens with greeting/filler ("hey guys, so today…"), return the
+    span to drop so it starts on the first real word. Conservative: only trims a
+    short leading run of clearly-filler words."""
+    if not words:
+        return None
+    i = 0
+    n = min(len(words), max_words)
+    while i < n and words[i].start <= max_seconds:
+        tok = _norm(words[i].text)
+        if not tok or (tok in _FILLER and not _STRONG_HINT.search(words[i].text)):
+            i += 1
+            continue
+        break
+    if i == 0 or i >= len(words):
+        return None
+    # need real content to remain, and don't nuke more than ~4.5s
+    if words[i].start > 4.5 or (len(words) - i) < 3:
+        return None
+    return (0.0, float(words[i].start))
+
+
+def build_edit_plan(fmt: str, words: Sequence[Word], cfg: dict) -> Dict:
+    """Produce the plan. Returns dict with keys: opening_strategy, removals
+    (list of (start,end,kind,reason)), headline (str|None), notes (list)."""
+    fmt = "long" if str(fmt).lower() == "long" else "short"
+    plan: Dict = {"opening_strategy": "chronological", "removals": [],
+                  "headline": None, "notes": []}
+
+    if fmt == "short" and words and cfg.get("cuts", {}).get("enabled", True):
+        plan["opening_strategy"] = "strongest_hook"
+        intro = find_weak_intro(words)
+        if intro:
+            plan["removals"].append((intro[0], intro[1], "weak_intro",
+                                     "skipped the greeting so it opens on the real content"))
+            plan["notes"].append("trimmed the weak intro")
+
+    # optional richer plan from Claude (never required)
+    if os.environ.get("ANTHROPIC_API_KEY") and words:
+        try:
+            _llm_enrich(fmt, words, plan)
+        except Exception as exc:  # keep the rule-based plan
+            plan["notes"].append(f"(AI plan skipped: {type(exc).__name__})")
+
+    return plan
+
+
+def _llm_enrich(fmt: str, words: Sequence[Word], plan: Dict) -> None:
+    import json
+
+    import anthropic
+
+    transcript = " ".join(w.text for w in words)
+    client = anthropic.Anthropic()
+    sys = (
+        "You are a video editor planning a " + fmt + "-form edit. From the "
+        "transcript, return ONLY JSON: {\"headline\": short 2-5 word hook or null, "
+        "\"cut_phrases\": [exact short quotes to REMOVE — false starts, mistakes, "
+        "rambling, 'I forgot the script']}. Keep cut_phrases short and verbatim."
+    )
+    msg = client.messages.create(
+        model="claude-sonnet-5", max_tokens=600, system=sys,
+        messages=[{"role": "user", "content": transcript[:4000]}],
+    )
+    raw = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
+    m = re.search(r"\{.*\}", raw, re.S)
+    if not m:
+        return
+    data = json.loads(m.group(0))
+    if data.get("headline") and not plan.get("headline"):
+        plan["headline"] = str(data["headline"])[:40]
+    for phrase in (data.get("cut_phrases") or [])[:12]:
+        span = _locate(words, str(phrase))
+        if span:
+            plan["removals"].append((span[0], span[1], "mistake", f"removed “{phrase[:40]}”"))
+    if data.get("cut_phrases"):
+        plan["notes"].append("AI removed spoken mistakes")
+
+
+def _locate(words: Sequence[Word], phrase: str) -> Optional[Segment]:
+    """Find a phrase's time span in the word list by normalized-token match."""
+    toks = [_norm(t) for t in phrase.split() if _norm(t)]
+    if not toks:
+        return None
+    wt = [_norm(w.text) for w in words]
+    for i in range(len(wt) - len(toks) + 1):
+        if wt[i:i + len(toks)] == toks:
+            return (float(words[i].start), float(words[i + len(toks) - 1].end))
+    return None
+
+
+# ---------------------------------------------------------------------------
+# "What I did" summary — assembled from what actually happened
+# ---------------------------------------------------------------------------
+
+def summarize(applied: dict, cfg: dict) -> List[str]:
+    """Human-readable edit decisions, built from the real applied data so it can
+    never claim something the render didn't do."""
+    out: List[str] = []
+    fmt = applied.get("format", "short")
+    W, H = applied.get("width"), applied.get("height")
+    out.append(f"Made a {'long-form 16:9' if fmt == 'long' else 'short-form 9:16'} video ({W}×{H}).")
+
+    rf = applied.get("reframe")
+    if rf == "blur_fill":
+        out.append("Fit the footage with a blurred background so the subject is never cropped.")
+    elif rf in ("cover_center", "cover_at"):
+        out.append("Reframed to fill the vertical frame.")
+
+    if applied.get("intro_trimmed"):
+        out.append("Cut the weak intro so it opens on the real content.")
+    sc = applied.get("smart_cut")
+    if isinstance(sc, dict) and sc.get("removed"):
+        out.append(f"Removed {len(sc['removed'])} spoken mistake(s)/tangent(s).")
+    sil = applied.get("silences_found")
+    if sil:
+        out.append(f"Tightened {sil} silent gap(s) / dead air.")
+
+    src, dur = applied.get("source_duration"), applied.get("output_duration")
+    if src and dur and dur < src - 0.2:
+        out.append(f"Tightened the length from {src:.0f}s to {dur:.0f}s.")
+    if applied.get("speed"):
+        out.append(f"Sped up {applied['speed']}× to fit the target (nothing cut).")
+
+    g = applied.get("graphics")
+    if isinstance(g, dict) and (g.get("hook") or g.get("pops")):
+        bits = []
+        if g.get("hook"):
+            bits.append(f"a “{g['hook']}” hook")
+        if g.get("pops"):
+            bits.append(f"{g['pops']} word pop-up(s)")
+        out.append("Added " + " and ".join(bits) + ".")
+    if applied.get("captions"):
+        mode = cfg.get("captions", {}).get("mode", "dynamic")
+        out.append(f"Burned in {mode} captions, synced to the speech.")
+    if applied.get("corrections"):
+        out.append(f"Fixed {len(applied['corrections'])} misheard word(s).")
+
+    music = applied.get("music")
+    if music:
+        out.append(f"Laid in background music ({music}), ducked under the voice.")
+    if applied.get("hdr_tonemapped"):
+        out.append("Corrected HDR color to standard range.")
+    if applied.get("cta"):
+        out.append("Added an end card with the business name and phone number.")
+    return out
