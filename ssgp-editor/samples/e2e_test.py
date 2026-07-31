@@ -88,10 +88,11 @@ def main():
     print("\nApplied:", applied)
     print(f"Output: {info.width}x{info.height} @ {info.fps:.1f}fps, "
           f"{info.duration:.2f}s, video={info.video_codec}, audio={info.audio_codec}")
-    assert info.width == 1080 and info.height == 1920, "not vertical 1080x1920!"
+    exp_w, exp_h = int(cfg["output"]["width"]), int(cfg["output"]["height"])
+    assert info.width == exp_w and info.height == exp_h, f"expected {exp_w}x{exp_h}, got {info.width}x{info.height}!"
     assert info.video_codec == "h264", "not H.264!"
     assert info.audio_codec is not None, "no audio track!"
-    print("\nPASS ✓  vertical H.264 with audio, captions + cuts + zoom + music + watermark + CTA")
+    print(f"\nPASS ✓  {exp_w}x{exp_h} H.264 with audio, captions + cuts + zoom + music + watermark + CTA")
 
 
 if __name__ == "__main__":

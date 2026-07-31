@@ -10,9 +10,17 @@
 # want for a vertical Reel, and they also re-encode iPhone HEVC into H.264.
 # ---------------------------------------------------------------------------
 output:
-  width: 1080          # px  — 9:16 vertical
-  height: 1920         # px
+  width: 1080          # px  — canvas width (Short=1080/9:16, Long=1920/16:9; set by format)
+  height: 1920         # px  — canvas height
   fps: 30              # frames per second
+  # How footage is fitted to the canvas when its shape differs:
+  #   cover_center — scale to fill, center-crop (best for 9:16 short-form)
+  #   cover_at     — fill + crop toward crop_x/crop_y focus point
+  #   fit_pad      — letterbox (no pixels lost, adds bars)
+  #   blur_fill    — fit in front of a blurred filled copy (best for 16:9 long-form)
+  reframe: cover_center
+  crop_x: 0.5          # focus point for cover_at (0=left, 1=right)
+  crop_y: 0.5          # focus point for cover_at (0=top, 1=bottom)
   video_codec: libx264 # H.264
   pixel_format: yuv420p # max compatibility (fixes iPhone HEVC issue)
   crf: 20              # quality: lower = better/bigger (18-23 is a good range)

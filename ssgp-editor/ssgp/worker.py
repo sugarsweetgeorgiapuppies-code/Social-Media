@@ -14,6 +14,7 @@ import traceback
 from pathlib import Path
 from typing import Callable, List, Optional
 
+from . import formats
 from . import instructions as instr_mod
 from .config import load_config, merge_options, resolve_path
 from .jobs import Job, JobStore
@@ -58,8 +59,14 @@ class RenderWorker:
 
         cfg = load_config()
 
-        # apply free-text instructions first, then explicit options win over them
+        # 1) format bundle (short vs long) as the BASE layer — sets aspect,
+        #    reframe, pacing, caption/graphics/music defaults for the chosen mode
         overrides = dict(job.options or {})
+        fmt = formats.normalize_format(str(overrides.pop("format", "") or "short"))
+        cfg = merge_options(cfg, formats.bundle(fmt))
+        cfg["format"] = fmt
+
+        # 2) free-text instructions, then explicit options win over them
         notes: List[str] = []
         if job.instructions:
             interp, notes = instr_mod.interpret(job.instructions, cfg)
@@ -68,6 +75,7 @@ class RenderWorker:
             # what was actually requested, so untouched toggles are preserved).
             overrides = _deep_merge(overrides, interp)
         cfg = merge_options(cfg, overrides)
+        cfg["format"] = fmt  # keep after merges (format is not an output leaf)
 
         self.store.update(job_id, status="processing", stage="preparing", progress=1, notes=notes)
 
@@ -103,7 +111,12 @@ class RenderWorker:
         # 2) stitch multiple clips into one vertical source
         if len(local_paths) > 1:
             self.store.update(job_id, stage="stitching clips", progress=3)
-            source = stitch_clips(local_paths, str(job_work / "stitched.mp4"), W, H, FPS, str(job_work), log_path)
+            source = stitch_clips(
+                local_paths, str(job_work / "stitched.mp4"), W, H, FPS, str(job_work), log_path,
+                mode=cfg["output"].get("reframe", "cover_center"),
+                crop_x=float(cfg["output"].get("crop_x", 0.5)),
+                crop_y=float(cfg["output"].get("crop_y", 0.5)),
+            )
         else:
             source = local_paths[0]
 

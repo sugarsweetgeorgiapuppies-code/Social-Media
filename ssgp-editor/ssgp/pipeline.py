@@ -26,6 +26,7 @@ from . import music as music_mod
 from . import silence as silence_mod
 from . import smartcut
 from . import graphics as graphics_mod
+from . import reframe
 from . import textrender
 from .config import resolve_path
 from .ffmpeg_utils import (
@@ -77,7 +78,9 @@ def render_video(
     info: ProbeInfo = probe(source_path)
     src_duration = info.duration or 0.0
 
-    applied = {"width": W, "height": H, "fps": FPS, "source_duration": round(src_duration, 2)}
+    applied = {"width": W, "height": H, "fps": FPS, "source_duration": round(src_duration, 2),
+               "format": cfg.get("format", "short"),
+               "aspect": f"{W}:{H}", "reframe": out.get("reframe", "cover_center")}
 
     # ---- 2/3) audio extraction + transcription -----------------------------
     words: List[Word] = []
@@ -381,22 +384,27 @@ def _video_pass(src, dst, cfg, W, H, FPS, duration, keeps, caption_list, fonts_d
     SDR up front so the result isn't washed-out/grey. Text is drawn by Pillow
     into transparent overlays, so this works on FFmpeg builds without libass.
     """
-    # base video chain: HDR->SDR (if any) + reframe + optional zoom
-    base = [
-        f"fps={FPS}",
-        f"scale={W}:{H}:force_original_aspect_ratio=increase",
-        f"crop={W}:{H}",
-    ]
+    # base video chain: HDR->SDR (if any) -> reframe to canvas -> optional zoom
+    o = cfg["output"]
+    mode = reframe.normalize_mode(o.get("reframe"), "cover_center")
+    crop_x, crop_y = float(o.get("crop_x", 0.5)), float(o.get("crop_y", 0.5))
+
+    inputs = ["-i", src]
+    # 1) colour-correct (HDR->SDR if needed) + lock fps
+    fc = f"[0:v]{color_prefix}fps={FPS}[pre]"
+    # 2) reframe the footage into the output aspect (center-crop for 9:16,
+    #    blur-fill/letterbox for 16:9 so the subject is never cropped out)
+    fc += ";" + reframe.reframe_fc("[pre]", "[rf]", mode, W, H, crop_x, crop_y)
+    # 3) Ken-Burns / punch zoom (optional), then square pixels
+    post: List[str] = []
     if cfg["zoom"].get("enabled"):
         expr = _zoompan_expr(cfg, duration, FPS, keeps)
-        base.append(
+        post.append(
             f"zoompan=z='{expr}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
             f":d=1:s={W}x{H}:fps={FPS}"
         )
-    base.append("setsar=1")  # square pixels (zoompan can emit odd SAR)
-
-    inputs = ["-i", src]
-    fc = f"[0:v]{color_prefix}{','.join(base)}[base]"
+    post.append("setsar=1")
+    fc += f";[rf]{','.join(post)}[base]"
     last = "base"
     idx = 1
 

@@ -18,6 +18,7 @@ from urllib.parse import parse_qs, urlparse
 import requests
 
 from .ffmpeg_utils import probe, run
+from .reframe import reframe_fc
 
 _CHUNK = 1 << 20  # 1 MiB
 
@@ -75,29 +76,37 @@ def download_source(url: str, dest: str, timeout: int = 120) -> str:
     return str(dest_p)
 
 
-def _normalise_clip(src: str, dst: str, w: int, h: int, fps: int, log_path=None) -> None:
-    """Reframe one clip to the vertical canvas so all clips share codec params."""
+def _normalise_clip(src: str, dst: str, w: int, h: int, fps: int, log_path=None,
+                    mode: str = "cover_center", crop_x: float = 0.5, crop_y: float = 0.5) -> None:
+    """Reframe one clip to the output canvas so all clips share codec params.
+
+    ``mode`` picks the reframe strategy (center-crop for 9:16, blur-fill/pad for
+    16:9 so a vertical clip isn't cropped to a sliver)."""
     info = probe(src)
-    vf = (
-        f"scale={w}:{h}:force_original_aspect_ratio=increase,"
-        f"crop={w}:{h},fps={fps},setsar=1,format=yuv420p"
-    )
+    fc = reframe_fc("[0:v]", "[rf]", mode, w, h, crop_x, crop_y) + f";[rf]fps={fps},format=yuv420p[vout]"
     cmd = ["ffmpeg", "-y", "-i", src]
+    maps = ["-map", "[vout]"]
+    tail: List[str] = []
     if not info.has_audio:
         # synthesise silent audio so every clip has a matching audio stream
-        cmd += ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100", "-shortest"]
+        cmd += ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"]
+        maps += ["-map", "1:a"]
+        tail = ["-shortest"]
+    else:
+        maps += ["-map", "0:a?"]
     cmd += [
-        "-vf", vf,
+        "-filter_complex", fc, *maps,
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-ar", "44100", "-ac", "2", "-b:a", "192k",
-        dst,
+        *tail, dst,
     ]
     run(cmd, log_path)
 
 
 def stitch_clips(
     paths: List[str], dest: str, w: int, h: int, fps: int, work_dir: str,
-    log_path=None, xfade: float = 0.35,
+    log_path=None, xfade: float = 0.35, mode: str = "cover_center",
+    crop_x: float = 0.5, crop_y: float = 0.5,
 ) -> str:
     """Stitch multiple clips into one vertical source, blended with a short
     crossfade (video xfade + audio acrossfade) so joins look smooth instead of
@@ -113,7 +122,7 @@ def stitch_clips(
     durs: List[float] = []
     for i, p in enumerate(paths):
         out = str(work / f"part{i:03d}.mp4")
-        _normalise_clip(p, out, w, h, fps, log_path)
+        _normalise_clip(p, out, w, h, fps, log_path, mode, crop_x, crop_y)
         norm.append(out)
         durs.append(probe(out).duration)
 

@@ -70,6 +70,13 @@ _FLAT_MAP = {
     "watermark": ("watermark", "enabled"),
     "cta": ("cta", "enabled"),
     "graphics": ("graphics", "enabled"),
+    "width": ("output", "width"),
+    "height": ("output", "height"),
+    "fps": ("output", "fps"),
+    "reframe": ("output", "reframe"),
+    "max_speed": ("output", "max_speed"),
+    "crop_x": ("output", "crop_x"),
+    "crop_y": ("output", "crop_y"),
     "music_volume": ("music", "volume"),
     "music_track": ("music", "track"),
     "zoom_intensity": ("zoom", "intensity"),
@@ -84,9 +91,25 @@ _FLAT_MAP = {
 }
 
 
+# aspect shorthand -> canvas size (kept 1080-based; overridable by width/height)
+_ASPECT_SIZES = {
+    "9:16": (1080, 1920), "16:9": (1920, 1080), "1:1": (1080, 1080),
+    "4:5": (1080, 1350), "vertical": (1080, 1920), "portrait": (1080, 1920),
+    "horizontal": (1920, 1080), "landscape": (1920, 1080), "square": (1080, 1080),
+}
+
+
 def _normalise_flat_options(options: Dict[str, Any]) -> Dict[str, Any]:
     nested: Dict[str, Any] = {}
+    # aspect is a convenience that expands to width/height (unless those are set)
+    aspect = options.get("aspect")
+    if isinstance(aspect, str) and aspect.lower() in _ASPECT_SIZES and \
+            "width" not in options and "height" not in options:
+        w, h = _ASPECT_SIZES[aspect.lower()]
+        nested.setdefault("output", {}).update({"width": w, "height": h})
     for key, val in options.items():
+        if key == "aspect":
+            continue
         if key in _FLAT_MAP and not isinstance(val, dict):
             section, leaf = _FLAT_MAP[key]
             nested.setdefault(section, {})[leaf] = val

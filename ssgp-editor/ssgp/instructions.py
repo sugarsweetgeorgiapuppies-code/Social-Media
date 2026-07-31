@@ -44,6 +44,12 @@ Options you may set (include ONLY what the request asks for; omit the rest):
 - graphics.enabled (bool): the smart title card + animated word pop-ups. Turn
   OFF for "no text pops", "no graphics", "just captions", "plain".
 - graphics.headline (str): force the opening hook text, e.g. 'say "3 reasons"'.
+- output.width / output.height (ints): the canvas. 1080x1920 = 9:16 vertical
+  (reels/tiktok/shorts), 1920x1080 = 16:9 widescreen (youtube/landscape),
+  1080x1080 = square. Set BOTH together when the request implies an orientation.
+- output.reframe (str): how footage fits the canvas — "cover_center" (fill+crop,
+  good for 9:16), "blur_fill" (fit in front of a blurred copy, good for 16:9 so
+  the subject isn't cropped), "fit_pad" (letterbox). Prefer blur_fill for 16:9.
 """
 
 
@@ -175,6 +181,19 @@ def _interpret_rules(t: str) -> Tuple[Dict, List[str]]:
     if _has(t, "cta", "end card", "call to action", "outro", "add the card", "closing card"):
         set_("cta", "enabled", True, "CTA end card on")
 
+    # aspect / orientation
+    if _has(t, "16:9", "16 by 9", "widescreen", "wide screen", "landscape", "horizontal",
+            "for youtube", "youtube video", "long form", "long-form"):
+        o.setdefault("output", {}).update({"width": 1920, "height": 1080, "reframe": "blur_fill"})
+        notes.append("16:9 widescreen")
+    elif _has(t, "9:16", "9 by 16", "vertical", "portrait", "for reels", "for a reel",
+              "for tiktok", "for shorts", "short form", "short-form"):
+        o.setdefault("output", {}).update({"width": 1080, "height": 1920, "reframe": "cover_center"})
+        notes.append("9:16 vertical")
+    elif _has(t, "square", "1:1", "1 by 1"):
+        o.setdefault("output", {}).update({"width": 1080, "height": 1080, "reframe": "blur_fill"})
+        notes.append("square 1:1")
+
     # smart graphics (title card + word pops)
     if _has(t, "no text pops", "no pops", "no graphics", "no title card", "no text overlay",
             "just captions", "plain", "no popups", "no pop ups"):
@@ -217,7 +236,9 @@ def _interpret_llm(text: str) -> Tuple[Dict, List[str]]:
 
     client = anthropic.Anthropic()
     system = (
-        "You configure a vertical-Reel video editor from a plain-English request. "
+        "You configure an AI video editor (short-form 9:16 vertical OR long-form "
+        "16:9 widescreen) from a plain-English request. Respect any orientation the "
+        "request implies. "
         + _CAPABILITIES
         + "\nReturn ONLY JSON: {\"options\": {nested overrides}, \"summary\": [short "
         "human phrases of what you changed]}. Include only options the request "
