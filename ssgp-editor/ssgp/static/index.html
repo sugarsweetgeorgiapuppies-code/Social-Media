@@ -413,8 +413,15 @@ fetch('/api/config').then(r=>r.json()).then(c=>{try{
   $('ctaBiz').value=c.cta.business||'';$('ctaPhone').value=c.cta.phone||'';
   const b=$('aiBanner');
   if(c.ai_editing_available){
-    b.style.display='block';b.style.borderColor='#1e5a3a';b.style.background='#0f2a1e';
-    b.innerHTML='<b style="color:var(--ok)">AI editing is ON.</b> It reads what’s said and edits to match your description — cutting mistakes, weak intros and rambling.';
+    b.style.display='block';b.style.borderColor='#3a4a1e';b.style.background='#20240f';
+    b.innerHTML='<b>Checking the AI editor…</b>';
+    fetch('/api/ai-check').then(r=>r.json()).then(k=>{
+      if(k.ok){b.style.borderColor='#1e5a3a';b.style.background='#0f2a1e';
+        b.innerHTML='<b style="color:var(--ok)">AI editing is ON and working</b> ('+esc(k.model||'')+'). It reads what’s said and edits to match your description.';}
+      else{b.style.borderColor='#5a1e1e';b.style.background='#2a1010';
+        b.innerHTML='<b style="color:var(--err)">AI key is set but the test call FAILED.</b> That’s why edits are bad — it’s silently falling back to basic trimming.<br>Error: <code style="color:var(--text)">'+esc(k.detail||k.reason||'unknown')+'</code>'+
+        (k.model?'<br>Model tried: <code style="color:var(--text)">'+esc(k.model)+'</code>. If that model name is wrong for your account, set a different one: <code style="color:var(--text)">export SSGP_MODEL=claude-3-5-sonnet-latest</code> then restart.':'');}
+    }).catch(()=>{});
   }else{
     b.style.display='block';b.style.borderColor='#5a4a1e';b.style.background='#2a2410';
     b.innerHTML='<b style="color:var(--yellow)">AI editing is OFF.</b> Right now it only trims silences. To make it actually understand and edit your video, set your Anthropic API key before starting the app:<br><code style="color:var(--text)">export ANTHROPIC_API_KEY=sk-ant-…</code> then <code style="color:var(--text)">python3 run.py</code>';
@@ -506,10 +513,19 @@ function renderDone(j){
   const did=(a.decisions||[]).map(d=>'<li>'+esc(d)+'</li>').join('');
   const wide=(a.width||1080)>(a.height||1920);
   $('resultCard').classList.toggle('wide',wide);
+  // diagnostics — make silent failures visible
+  let diag='';
+  const sc=a.smart_cut;
+  if(a.ai_editing===false) diag+='<div class="stage" style="margin-top:8px;color:var(--yellow)">AI editing was OFF for this render — it only trimmed silences. Set your API key (see the banner up top) for a real edit.</div>';
+  else if(sc&&sc.status==='error') diag+='<div class="stage err" style="margin-top:8px">AI editor couldn’t run: '+esc(sc.detail||'error')+'. It fell back to basic trimming. (Often a wrong model name or an API key without access.)</div>';
+  else if(sc&&sc.status==='ok'&&(!sc.removed||!sc.removed.length)) diag+='<div class="stage" style="margin-top:8px">AI editor ran but decided nothing needed cutting.</div>';
+  if(a.captions_error) diag+='<div class="stage err" style="margin-top:6px">Captions couldn’t be generated: '+esc(a.captions_error)+'</div>';
+  const tr=a.transcript?'<details style="margin-top:8px"><summary style="cursor:pointer;color:var(--muted);font-size:12px">What it heard (transcript)</summary><div class="stage" style="margin-top:6px">'+esc(a.transcript)+'</div></details>':'';
   setResult(
     '<div class="stage ok">Done ✓ '+(a.output_duration?a.output_duration+'s':'')+'</div>'+
     '<video src="'+j.url+'" controls autoplay muted playsinline></video>'+
     (did?'<div class="did"><h3>What I did</h3><ul>'+did+'</ul></div>':'')+
+    diag+tr+
     '<div class="actions">'+
       '<a class="btn pri" href="'+j.url+'" download>Download</a>'+
       '<button class="btn" id="regen">Regenerate</button>'+

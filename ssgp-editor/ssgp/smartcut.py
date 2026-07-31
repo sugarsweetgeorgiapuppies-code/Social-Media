@@ -78,7 +78,7 @@ def plan_removals(words: Sequence[Word], cfg_cuts: dict,
                 "detail": "anthropic package not installed", "reasons": []}
 
     instructions = cfg_cuts.get("smart_cut_instructions") or _DEFAULT_INSTRUCTIONS
-    model = cfg_cuts.get("smart_cut_model") or "claude-sonnet-5"
+    model = os.environ.get("SSGP_MODEL") or cfg_cuts.get("smart_cut_model") or "claude-sonnet-5"
     transcript = _transcript_lines(words)
 
     # format-aware editing philosophy

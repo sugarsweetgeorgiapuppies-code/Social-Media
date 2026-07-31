@@ -14,6 +14,7 @@ Endpoints
 from __future__ import annotations
 
 import json
+import os
 import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -149,6 +150,25 @@ async def api_config():
     from . import smartcut
     cfg["ai_editing_available"] = smartcut.available(cfg.get("cuts", {}))
     return cfg
+
+
+@app.get("/api/ai-check")
+async def ai_check():
+    """Actually call Claude with a tiny prompt so the UI can tell the user whether
+    the AI editor truly works (key valid + model accessible), not just 'key set'."""
+    cfg = load_config()
+    from . import smartcut
+    key = smartcut._api_key(cfg.get("cuts", {}))
+    if not key:
+        return {"ok": False, "reason": "no_key"}
+    model = os.environ.get("SSGP_MODEL") or cfg.get("cuts", {}).get("smart_cut_model") or "claude-sonnet-5"
+    try:
+        import anthropic
+        anthropic.Anthropic(api_key=key).messages.create(
+            model=model, max_tokens=5, messages=[{"role": "user", "content": "ok"}])
+        return {"ok": True, "model": model}
+    except Exception as exc:
+        return {"ok": False, "reason": "error", "model": model, "detail": f"{type(exc).__name__}: {exc}"}
 
 
 @app.get("/api/music")
