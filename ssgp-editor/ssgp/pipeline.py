@@ -315,7 +315,7 @@ def render_video(
                                    f"gets while the voice still sounds natural")
 
     cta = cfg["cta"]
-    if cta.get("enabled") and (cta.get("title") or cta.get("phone")):
+    if cta.get("enabled") and (cta.get("business") or cta.get("title") or cta.get("phone")):
         progress(97, "cta")
         card = str(work / "card.mp4")
         _build_cta_card(card, cfg, W, H, FPS, fonts_dir, work, log_path)

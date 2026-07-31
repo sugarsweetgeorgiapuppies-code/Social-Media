@@ -86,6 +86,8 @@ _FLAT_MAP = {
     "language": ("captions", "language"),
     "watermark_text": ("watermark", "text"),
     "cta_title": ("cta", "title"),
+    "cta_business": ("cta", "business"),
+    "cta_location": ("cta", "location"),
     "cta_subtitle": ("cta", "subtitle"),
     "cta_phone": ("cta", "phone"),
 }
