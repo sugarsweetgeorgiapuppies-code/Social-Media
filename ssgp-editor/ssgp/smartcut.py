@@ -88,10 +88,11 @@ def plan_removals(words: Sequence[Word], cfg_cuts: dict,
                       "genuinely dead/off-topic stretches. Do NOT tighten aggressively and "
                       "do not remove normal pauses.")
     else:
-        philosophy = ("This is a SHORT-FORM video for social media. Be decisive: keep only "
-                      "the strongest, most engaging, on-message content. Cut weak intros, "
-                      "rambling, repetition, filler and anything that isn't pulling its "
-                      "weight, so the result is punchy and hooks fast.")
+        philosophy = ("This is a SHORT-FORM video for social media. Tighten it: remove weak "
+                      "intros, false starts, repetition and filler so it hooks fast. BUT the "
+                      "result must stay COMPLETE and coherent — a clear beginning, middle and "
+                      "a real ending. Do NOT over-cut or make it feel unfinished or jumpy. "
+                      "ALWAYS keep the closing statement.")
 
     user_block = ""
     if user_instruction.strip():
@@ -105,7 +106,8 @@ def plan_removals(words: Sequence[Word], cfg_cuts: dict,
         user_block + "\n\n"
         "Return ONLY a JSON array of objects {\"start\": number, \"end\": number, "
         "\"reason\": short string}, timestamps in seconds, no prose. Never cut in a way "
-        "that clips a word mid-sentence. Empty array if nothing should be cut."
+        "that clips a word mid-sentence, and NEVER cut the final closing line. Empty "
+        "array if nothing should be cut."
     )
 
     try:

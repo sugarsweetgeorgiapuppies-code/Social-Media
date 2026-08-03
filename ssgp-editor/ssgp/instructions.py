@@ -43,7 +43,8 @@ Options you may set (include ONLY what the request asks for; omit the rest):
   -> 60, "keep it to 15s" -> 15.
 - graphics.enabled (bool): the smart title card + animated word pop-ups. Turn
   OFF for "no text pops", "no graphics", "just captions", "plain".
-- graphics.headline (str): force the opening hook text, e.g. 'say "3 reasons"'.
+NEVER put the user's editing instructions into any on-screen text or headline.
+The instruction tells you HOW to edit; it is not caption or title content.
 - output.width / output.height (ints): the canvas. 1080x1920 = 9:16 vertical
   (reels/tiktok/shorts), 1920x1080 = 16:9 widescreen (youtube/landscape),
   1080x1080 = square. Set BOTH together when the request implies an orientation.
@@ -74,6 +75,13 @@ def interpret(text: str, base_cfg: dict | None = None) -> Tuple[Dict, List[str]]
             notes = notes + [f"(AI interpret failed: {type(exc).__name__}; used keywords)"]
     else:
         o, notes = _interpret_rules(text.lower())
+
+    # Guard: the instruction must never leak onto the screen as a title/caption.
+    # (The model sometimes reads "open on the strongest line" as headline text.)
+    if isinstance(o.get("graphics"), dict):
+        o["graphics"].pop("headline", None)
+        if not o["graphics"]:
+            o.pop("graphics")
 
     # Always apply these deterministic parses on top (reliable, not model-guessed):
     # explicit word corrections ("change X to Y") and protect-the-ending.

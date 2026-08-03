@@ -110,8 +110,8 @@ def _llm_enrich(fmt: str, words: Sequence[Word], plan: Dict) -> None:
     if not m:
         return
     data = json.loads(m.group(0))
-    if data.get("headline") and not plan.get("headline"):
-        plan["headline"] = str(data["headline"])[:40]
+    # (headline intentionally not taken from the LLM — the on-screen title only
+    #  comes from a clear enumeration hook, never invented text.)
     for phrase in (data.get("cut_phrases") or [])[:12]:
         span = _locate(words, str(phrase))
         if span:

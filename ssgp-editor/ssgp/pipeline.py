@@ -50,6 +50,20 @@ def _noop(pct: int, stage: str) -> None:  # default progress sink
     pass
 
 
+def _protect_ending(removals, cutoff: float):
+    """Drop/clamp any cut that reaches into the protected tail (``cutoff``), so the
+    closing line is never removed and the video always finishes."""
+    out = []
+    for s, e in removals:
+        s, e = float(s), float(e)
+        if s >= cutoff:          # cut starts inside the protected ending -> drop it
+            continue
+        e = min(e, cutoff)       # trim a cut that spills into the ending
+        if e > s:
+            out.append((s, e))
+    return out
+
+
 # ---------------------------------------------------------------------------
 
 
@@ -210,6 +224,9 @@ def render_video(
     progress(70, "plan-cuts")
     keeps: List[Segment] = [(0.0, src_duration)]
     c = cfg["cuts"]
+    # Protect the ending: no AI/plan cut may touch the last ~1.2s of speech, so
+    # the video always plays through to a real finish.
+    tail_cutoff = (float(words[-1].end) - 1.2) if words else src_duration
     if want_cuts:
         silences = silence_mod.detect_silences(
             audio_wav,
@@ -233,7 +250,7 @@ def render_video(
         if run_smart:
             progress(74, "ai-edit")
             sc = smartcut.plan_removals(words, c, user_instruction, cfg.get("format", "short"))
-            removals = sc.get("removals", [])
+            removals = _protect_ending(sc.get("removals", []), tail_cutoff)
             if removals:
                 keeps = silence_mod.subtract_ranges(keeps, removals, float(c.get("min_segment", 0.2)))
             applied["smart_cut"] = {
@@ -254,7 +271,8 @@ def render_video(
                               "removed": [[round(s, 2), round(e, 2)] for s, e in dremovals]}
 
     # Edit-plan removals (weak intro, AI-found mistakes) — applied when cutting.
-    plan_removals = [(float(s), float(e)) for (s, e, *_rest) in edit_plan.get("removals", [])]
+    plan_removals = _protect_ending(
+        [(float(s), float(e)) for (s, e, *_rest) in edit_plan.get("removals", [])], tail_cutoff)
     if want_cuts and plan_removals:
         keeps = silence_mod.subtract_ranges(keeps, plan_removals, float(c.get("min_segment", 0.2)))
         if any(k == "weak_intro" for (_s, _e, k, *_r) in edit_plan["removals"]):

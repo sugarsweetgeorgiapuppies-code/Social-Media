@@ -114,7 +114,8 @@ graphics:
   hook: true                 # show an opening headline card
   headline: null             # force a specific headline; null = auto ("3 things", or AI)
   hook_seconds: 2.2          # how long the hook card stays up
-  use_ai: true               # let Claude write a snappier hook when an API key is set
+  use_ai: false              # let Claude invent a headline. OFF — it produced off-topic
+                             # titles. The card only shows for clear "3 things" style hooks.
   pops: false                # animated word call-outs during the clip. OFF — they read as
                              # random clutter. The opening title card (hook) is enough.
   max_pops: 7                # at most this many pops in one clip
