@@ -92,8 +92,8 @@ captions:
   shadow: 2                   # px drop shadow (0 = off)
 
   # active-word highlight effect (the word being spoken pops)
-  highlight_color: "#ffd24a"  # colour of the active word; set equal to fill_color for a white-only pop
-  highlight_scale: 1.14       # active word is scaled up this much (1.0 = no size change)
+  highlight_color: "#2ec5e6"  # brand teal — colour of the active word (set equal to fill_color for white-only)
+  highlight_scale: 1.10       # active word is scaled up this much (1.0 = no size change)
 
   # layout
   position_pct: 0.74          # vertical position of the caption baseline (0=top, 1=bottom). 0.74 = lower third.
@@ -115,7 +115,8 @@ graphics:
   headline: null             # force a specific headline; null = auto ("3 things", or AI)
   hook_seconds: 2.2          # how long the hook card stays up
   use_ai: true               # let Claude write a snappier hook when an API key is set
-  pops: true                 # animated word call-outs during the clip
+  pops: false                # animated word call-outs during the clip. OFF — they read as
+                             # random clutter. The opening title card (hook) is enough.
   max_pops: 7                # at most this many pops in one clip
   min_spacing: 2.0           # seconds between pops (keeps it from getting busy)
   pop_hold: 1.1              # seconds each pop stays up
@@ -128,7 +129,7 @@ graphics:
   hook_pos_pct: 0.16         # headline vertical position (0=top .. 1=bottom)
   hook_stroke: 5
   pop_size: 104
-  pop_color: "#ffd23f"       # brand yellow
+  pop_color: "#2ec5e6"       # brand teal (only used if pops are turned back on)
   pop_stroke: "#12263a"      # dark outline
   pop_stroke_w: 8
   pop_pos_pct: 0.42          # pop vertical position (upper-middle, above captions)
@@ -214,8 +215,8 @@ cta:
   # colours (tuned for a white card)
   title_color: "#12263a"     # business name (navy)
   muted_color: "#5b6b7a"     # tagline + location (slate)
-  accent_color: "#ffd23f"    # phone pill background (brand yellow)
-  phone_text_color: "#12263a" # phone text on the yellow pill
+  accent_color: "#1c93b0"    # phone pill background (brand teal)
+  phone_text_color: "#ffffff" # phone text on the teal pill
   font_weight: 800
   # sizes (auto-shrink to fit width)
   tagline_size: 50
