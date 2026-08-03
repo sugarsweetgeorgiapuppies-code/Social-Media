@@ -18,3 +18,5 @@ music/*
 # local test samples — keep only the self-test script
 samples/*
 !samples/e2e_test.py
+.ssgp-key
+!samples/test_formats.py
