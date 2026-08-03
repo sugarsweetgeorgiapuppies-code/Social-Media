@@ -120,6 +120,86 @@ def _llm_enrich(fmt: str, words: Sequence[Word], plan: Dict) -> None:
         plan["notes"].append("AI removed spoken mistakes")
 
 
+def auto_direct(words: Sequence[Word], info, instruction: str = "", fmt: str = "short") -> Optional[Dict]:
+    """AI creative director — decide the WHOLE edit from the content, so the user
+    (or an automated workflow) doesn't configure anything. Returns a decisions
+    dict, or None when Claude isn't available (caller falls back to heuristics).
+
+    Decides: captions off/clean/dynamic, music off/subtle/energetic, a target
+    length, and an optional short hook. The detailed cuts are handled separately
+    by the smart-cut pass.
+    """
+    if not words or not os.environ.get("ANTHROPIC_API_KEY"):
+        return None
+    try:
+        import json as _json
+
+        import anthropic
+
+        transcript = " ".join(w.text for w in words)
+        dur = getattr(info, "duration", 0.0) or 0.0
+        model = os.environ.get("SSGP_MODEL") or "claude-sonnet-5"
+        sys = (
+            "You are the creative director for Sugar Sweet Georgia Puppies (a puppy store). "
+            "Decide how to turn this RAW clip into the best possible " + fmt + "-form social "
+            "video. Judge from what is said, the energy, and the length — make real choices, "
+            "don't add things by default. Return ONLY JSON:\n"
+            '{"captions":"off|clean|dynamic","music":"off|subtle|energetic",'
+            '"target_seconds": number or null, "hook": short 2-5 word title or null, '
+            '"reasoning":"one short sentence"}\n'
+            "Guidance: captions DYNAMIC for punchy talking that benefits from emphasis; CLEAN "
+            "for calm/informational talking; OFF when there's little meaningful speech (mostly "
+            "ambience, music or cuteness) — it doesn't always need captions. Music ENERGETIC for "
+            "fun/fast, SUBTLE for calm, OFF when the talking should stand alone. A hook only if "
+            "there's a genuinely strong opening line; otherwise null. Short-form target 15-60s."
+        )
+        user = f"Length: {dur:.0f}s.\nTranscript: {transcript[:3500]}"
+        if instruction.strip():
+            user += f"\nThe user's goal (respect it): {instruction.strip()}"
+        client = anthropic.Anthropic()
+        msg = client.messages.create(model=model, max_tokens=400, system=sys,
+                                     messages=[{"role": "user", "content": user}])
+        raw = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
+        m = re.search(r"\{.*\}", raw, re.S)
+        d = _json.loads(m.group(0)) if m else {}
+        return _clean_direction(d)
+    except Exception:
+        return None
+
+
+def auto_heuristic(words: Sequence[Word], info, fmt: str = "short") -> Dict:
+    """No-LLM fallback director: sensible defaults from simple signals."""
+    dur = getattr(info, "duration", 0.0) or 0.0
+    n = len(words)
+    speech_ratio = (sum(w.end - w.start for w in words) / dur) if (dur and words) else 0.0
+    if n < 4 or speech_ratio < 0.12:
+        caps = "off"            # barely any talking -> no captions
+    elif fmt == "long":
+        caps = "clean"
+    else:
+        caps = "dynamic"
+    return _clean_direction({"captions": caps, "music": "subtle", "target_seconds": None,
+                             "hook": None, "reasoning": "auto (no AI key): chose from speech amount"})
+
+
+def _clean_direction(d: Dict) -> Dict:
+    caps = str(d.get("captions", "dynamic")).lower()
+    if caps not in ("off", "clean", "dynamic"):
+        caps = "dynamic"
+    mus = str(d.get("music", "subtle")).lower()
+    if mus not in ("off", "subtle", "energetic"):
+        mus = "subtle"
+    tgt = d.get("target_seconds")
+    try:
+        tgt = float(tgt) if tgt not in (None, "", "null") else None
+    except (TypeError, ValueError):
+        tgt = None
+    hook = d.get("hook")
+    hook = str(hook)[:40] if hook and str(hook).lower() not in ("null", "none", "") else None
+    return {"captions": caps, "music": mus, "target_seconds": tgt, "hook": hook,
+            "reasoning": str(d.get("reasoning", ""))[:200]}
+
+
 def _locate(words: Sequence[Word], phrase: str) -> Optional[Segment]:
     """Find a phrase's time span in the word list by normalized-token match."""
     toks = [_norm(t) for t in phrase.split() if _norm(t)]
@@ -150,6 +230,11 @@ def summarize(applied: dict, cfg: dict) -> List[str]:
     elif rf in ("cover_center", "cover_at"):
         out.append("Reframed to fill the vertical frame.")
 
+    ad = applied.get("auto_director")
+    if isinstance(ad, dict):
+        note = ad.get("reasoning") or "AI chose the whole edit"
+        out.append("AI director: " + note)
+        out.append(f"Chose captions: {ad.get('captions')}, music: {ad.get('music')}.")
     if applied.get("ai_editing"):
         out.append("AI editor read the transcript and edited to match your description.")
     if applied.get("intro_trimmed"):

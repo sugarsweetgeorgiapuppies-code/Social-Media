@@ -63,6 +63,10 @@ class RenderWorker:
         #    reframe, pacing, caption/graphics/music defaults for the chosen mode
         overrides = dict(job.options or {})
         fmt = formats.normalize_format(str(overrides.pop("format", "") or "short"))
+        # AUTO: AI decides captions/music/length/hook. Default ON (drop-in for a
+        # workflow); the UI turns it off to use the manual controls.
+        _auto = overrides.pop("auto", True)
+        auto = _auto.lower() not in ("false", "0", "no", "off") if isinstance(_auto, str) else bool(_auto)
         cfg = merge_options(cfg, formats.bundle(fmt))
         cfg["format"] = fmt
 
@@ -76,6 +80,7 @@ class RenderWorker:
             overrides = _deep_merge(overrides, interp)
         cfg = merge_options(cfg, overrides)
         cfg["format"] = fmt  # keep after merges (format is not an output leaf)
+        cfg["auto"] = auto
 
         self.store.update(job_id, status="processing", stage="preparing", progress=1, notes=notes)
 

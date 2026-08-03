@@ -191,7 +191,13 @@
         <h2><span class="step">4</span>The essentials</h2>
         <p class="help">I handle the rest automatically. Fine-tune only if you want to.</p>
 
-        <div class="ctrl">
+        <div class="tgl" style="border-top:none">
+          <div class="txt"><b>Let the AI decide everything</b><span>length, captions, music &amp; pacing — recommended</span></div>
+          <label class="sw"><input type="checkbox" id="t_auto" checked><span class="sl"></span></label>
+        </div>
+        <div id="autoNote" class="stage" style="color:var(--muted);font-size:12.5px;margin:4px 0 6px">The AI will watch the clip and choose the length, whether to add captions, music and pacing for you. It won’t add captions if the clip doesn’t need them.</div>
+
+        <div class="ctrl manual">
           <div class="lab">Length <small id="lenHint">fit everything into this</small></div>
           <div class="seg" id="lenSeg"></div>
           <div id="lenCustomWrap" style="display:none;margin-top:9px">
@@ -212,7 +218,7 @@
           </div>
         </div>
 
-        <div class="ctrl">
+        <div class="ctrl manual">
           <div class="lab">Captions</div>
           <div class="seg" id="capSeg">
             <button data-cap="off">Off</button>
@@ -221,7 +227,7 @@
           </div>
         </div>
 
-        <div class="ctrl">
+        <div class="ctrl manual">
           <div class="lab">Music</div>
           <div class="seg" id="musSeg">
             <button data-mus="off">Off</button>
@@ -397,6 +403,12 @@ function renderClips(){
   $('go').disabled=n===0;
 }
 
+/* auto master toggle — hide manual creative controls when the AI decides */
+function syncAuto(){const on=$('t_auto').checked;
+  document.querySelectorAll('.manual').forEach(el=>el.style.display=on?'none':'block');
+  $('autoNote').style.display=on?'block':'none';}
+$('t_auto').onchange=syncAuto;
+
 /* end-card fields */
 $('t_cta').onchange=()=>$('ctaFields').style.display=$('t_cta').checked?'block':'none';
 
@@ -430,7 +442,7 @@ fetch('/api/config').then(r=>r.json()).then(c=>{try{
 
 /* ---------- build options ---------- */
 function collectOptions(){
-  const o={format:state.format};
+  const o={format:state.format,auto:$('t_auto').checked};
   // captions
   if(state.captions==='off') o.captions={enabled:false};
   else o.captions={enabled:true,mode:state.captions,model:$('model').value,time_offset:parseFloat($('s_captime').value)};
@@ -554,7 +566,7 @@ function pollBatch(ids){
 }
 
 /* init */
-setFormat('short');renderClips();
+setFormat('short');renderClips();syncAuto();
 </script>
 </body>
 </html>

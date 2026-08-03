@@ -166,6 +166,32 @@ def render_video(
     if words:
         applied["transcript"] = " ".join(w.text for w in words)
 
+    # ---- 3a) AUTO-DIRECTOR: let the AI decide the whole edit (captions on/off,
+    # music, length, hook) from the content — no manual config needed. This is
+    # what makes it drop-in for an automated workflow. Explicit user controls are
+    # only honored when auto is off.
+    if cfg.get("auto", False) and words:
+        progress(24, "directing")
+        fmt = cfg.get("format", "short")
+        d = plan_mod.auto_direct(words, info, user_instruction, fmt) or \
+            plan_mod.auto_heuristic(words, info, fmt)
+        caps = d["captions"]
+        cfg["captions"]["enabled"] = caps != "off"
+        cfg["captions"]["mode"] = "dynamic" if caps == "dynamic" else "clean"
+        if caps == "clean":
+            cfg["captions"]["render_granularity"] = "per_line"
+        cfg.setdefault("graphics", {})["enabled"] = caps != "off"  # no text when captions off
+        cfg["music"]["enabled"] = d["music"] != "off"
+        if d["music"] == "energetic":
+            cfg["music"]["volume"] = 0.28
+        elif d["music"] == "subtle":
+            cfg["music"]["volume"] = 0.12 if fmt == "long" else 0.16
+        if d["target_seconds"]:
+            cfg["output"]["max_duration"] = d["target_seconds"]
+        if d["hook"]:
+            cfg["graphics"]["headline"] = d["hook"]
+        applied["auto_director"] = d
+
     # ---- 3b) EDIT PLAN: decide the edit before any pixels are rendered ------
     # Chooses the opening, a hook, and extra removals (weak intro / mistakes).
     # It only writes into settings the pipeline already consumes, so plan and
@@ -184,7 +210,7 @@ def render_video(
     # part of the frames and get cut in lockstep with the video — they can
     # never drift out of sync no matter how many cuts happen.
     caption_list = None
-    if words:
+    if words and cfg["captions"].get("enabled", True):
         progress(30, "captions")
         caption_list = textrender.build_caption_track(words, cfg["captions"], fonts_dir, W, H, work, FPS)
 
