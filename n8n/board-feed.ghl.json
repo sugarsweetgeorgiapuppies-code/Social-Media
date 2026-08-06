@@ -111,7 +111,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "=https://services.leadconnectorhq.com/calendars/events?locationId=7OAoy2QT49JimX9IsVnf&calendarId=g8MCjvLjpPvyvu4k3WGG&startTime={{ $now.minus({ hours: 6 }).toMillis() }}&endTime={{ $now.plus({ hours: 42 }).toMillis() }}",
+        "url": "=https://services.leadconnectorhq.com/calendars/events?locationId=7OAoy2QT49JimX9IsVnf&calendarId=g8MCjvLjpPvyvu4k3WGG&startTime={{ $now.minus({ hours: 24 }).toMillis() }}&endTime={{ $now.plus({ hours: 48 }).toMillis() }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
