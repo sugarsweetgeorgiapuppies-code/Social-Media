@@ -1,63 +1,46 @@
 /* ============================================================================
-   Lead & Floor Board — client logic
+   Lead & Appointment Board — client logic
    ----------------------------------------------------------------------------
-   Runs unattended on a wall TV. Polls one JSON endpoint and renders three
-   panels that follow the customer lifecycle:
+   Two panels: New Inquiries (count-up) and Appointments Today (countdown).
+   Everything renders on a fixed 1920x1080 canvas that is scaled to fit the
+   display. Timers/countdowns tick every second, client-side.
 
-     1. New Inquiries    — count-up since the inquiry arrived   (longer = worse)
-     2. Appointments     — COUNTDOWN to a booked appointment time
-     3. On the Floor     — count-up since check-in
-
-   All timers/countdowns tick every second, client-side. The display does no
-   pipeline-stage logic: n8n decides which array each record lands in, we just
-   render what we receive.
-
-   TUNE ME: every threshold and interval lives in the CONFIG block below so you
-   never have to hunt through the code to adjust the color bands.
+   TUNE ME: all color thresholds and intervals are named constants below.
    ========================================================================== */
 "use strict";
 
 /* ------------------------------------------------------------------ CONFIG */
 
-/* --- New Inquiries: count-up thresholds, in SECONDS (longer wait = worse). */
+/* New Inquiries: count-up thresholds in SECONDS (longer wait = more urgent). */
 const INQUIRY_LEVELS = [
-  { level: "calm",   maxSeconds:  5 * 60 }, //  0–5  min  — calm green
-  { level: "amber",  maxSeconds: 15 * 60 }, //  5–15 min  — amber
-  { level: "orange", maxSeconds: 30 * 60 }, // 15–30 min  — orange
-  { level: "red",    maxSeconds: Infinity }, // 30+  min  — red + slow pulse
+  { level: "green",  maxSeconds:  5 * 60 }, //  0–5  min
+  { level: "blush",  maxSeconds: 15 * 60 }, //  5–15 min
+  { level: "orange", maxSeconds: 30 * 60 }, // 15–30 min
+  { level: "red",    maxSeconds: Infinity }, // 30+  min  (pulses)
 ];
 
-/* --- On the Floor: count-up thresholds, in SECONDS. */
-const FLOOR_LEVELS = [
-  { level: "neutral", maxSeconds: 10 * 60 }, //  0–10 min  — neutral
-  { level: "amber",   maxSeconds: 20 * 60 }, // 10–20 min  — amber (check in)
-  { level: "orange",  maxSeconds: 40 * 60 }, // 20–40 min  — orange (attention)
-  { level: "red",     maxSeconds: Infinity }, // 40+  min  — red + slow pulse
-];
-
-/* --- Appointments: COUNTDOWN thresholds, in SECONDS relative to appt time.
-   `remaining` is positive before the appointment, negative once it's past. */
+/* Appointments: COUNTDOWN thresholds in SECONDS relative to the appt time.
+   `remaining` is positive before the appointment, negative once it's past.
+   Each level also has a `rank` used for urgency sorting (0 = most urgent). */
 const APPOINTMENT_THRESHOLDS = {
-  neutralBeyondSec: 60 * 60, // remaining above this        -> neutral (dim)
+  neutralBeyondSec: 60 * 60, // remaining above this        -> neutral (later today)
   prepWithinSec:    15 * 60, // remaining above this (≤60m) -> blue (prep)
   // remaining at/below prepWithinSec, down to -lateAfterSec -> green (arriving)
-  lateAfterSec:     10 * 60, // this many seconds PAST appt -> amber (late?)
+  lateAfterSec:     10 * 60, // this many seconds PAST appt -> orange (late)
   noShowAfterSec:   20 * 60, // this many seconds PAST appt -> red (no-show)
 };
 
-/* Every CSS urgency class we might add to a card (used to reset before re-tag). */
 const ALL_LEVEL_CLASSES = [
-  "lvl-calm", "lvl-neutral", "lvl-blue", "lvl-green",
-  "lvl-amber", "lvl-orange", "lvl-red",
+  "lvl-green", "lvl-blue", "lvl-blush", "lvl-orange", "lvl-red", "lvl-neutral",
 ];
 
 /* Fallbacks — overridden at runtime by /board/config. */
 const CONFIG = {
-  pollSeconds: 15, // how often we re-poll the feed
-  staleSeconds: 90, // no successful poll within this window => "connection lost"
+  pollSeconds: 15, // re-poll the feed
+  staleSeconds: 90, // no successful poll within this => "connection lost"
   feedUrl: "/board/feed",
   configUrl: "/board/config",
-  storeName: "Lead & Floor Board",
+  storeName: "Lead & Appointment Board",
 };
 
 /* --------------------------------------------------------------- utilities */
@@ -65,22 +48,19 @@ const CONFIG = {
 const $ = (sel) => document.querySelector(sel);
 const now = () => Date.now();
 
-/** Level lookup for a count-up age (seconds) against a threshold table. */
 function levelFor(ageSeconds, table) {
-  for (const band of table) {
-    if (ageSeconds < band.maxSeconds) return band.level;
-  }
+  for (const band of table) if (ageSeconds < band.maxSeconds) return band.level;
   return table[table.length - 1].level;
 }
 
-/** Countdown -> {level, label} for an appointment, `remaining` in seconds. */
+/** Countdown -> {level, rank} for an appointment, `remaining` in seconds. */
 function appointmentLevel(remaining) {
   const T = APPOINTMENT_THRESHOLDS;
-  if (remaining > T.neutralBeyondSec) return { level: "neutral", label: "Upcoming" };
-  if (remaining > T.prepWithinSec) return { level: "blue", label: "Prep" };
-  if (-remaining < T.lateAfterSec) return { level: "green", label: "Arriving" };
-  if (-remaining < T.noShowAfterSec) return { level: "amber", label: "Late?" };
-  return { level: "red", label: "No show — call" };
+  if (remaining > T.neutralBeyondSec) return { level: "neutral", rank: 4 };
+  if (remaining > T.prepWithinSec) return { level: "blue", rank: 3 };     // prep
+  if (-remaining < T.lateAfterSec) return { level: "green", rank: 2 };    // arriving
+  if (-remaining < T.noShowAfterSec) return { level: "orange", rank: 1 }; // late
+  return { level: "red", rank: 0 };                                       // no-show
 }
 
 /** MM:SS under an hour, then H:MM. */
@@ -91,21 +71,17 @@ function fmtTimer(ageSeconds) {
   return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 }
 
-/** Live countdown text: "in 42:15", "in 2:40", or "12:30 late". */
-function fmtCountdown(remaining) {
-  const s = Math.abs(Math.floor(remaining));
-  let body;
-  if (s >= 3600) body = `${Math.floor(s / 3600)}:${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}`;
-  else body = `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
-  return remaining >= 0 ? `in ${body}` : `${body} late`;
+/** Countdown body like "45:00" or "2:40" (no "in"/"late" prefix). */
+function fmtCountBody(sec) {
+  const s = Math.abs(Math.floor(sec));
+  if (s >= 3600) return `${Math.floor(s / 3600)}:${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}`;
+  return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 }
 
-/** A wall-clock time like "2:30 PM". */
 function fmtClock(ms) {
   return new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
-/** Local calendar-day key, for today/tomorrow bucketing. */
 function dayKey(ms) {
   const d = new Date(ms);
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
@@ -113,8 +89,7 @@ function dayKey(ms) {
 
 function esc(v) {
   return String(v ?? "").replace(/[&<>"]/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])
-  );
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
 
 function parseMs(iso) {
@@ -123,20 +98,14 @@ function parseMs(iso) {
 }
 
 /* ------------------------------------------------------------------- chime */
-/* A short two-tone beep when a card crosses into red. Muted by default; the
-   only interactive control on the whole board is the mute toggle, and its click
-   doubles as the user gesture that unlocks audio. */
 const Chime = {
-  on: false,
-  ctx: null,
+  on: false, ctx: null,
   enable() {
     this.on = true;
     try {
       this.ctx = this.ctx || new (window.AudioContext || window.webkitAudioContext)();
       if (this.ctx.state === "suspended") this.ctx.resume();
-    } catch (_) {
-      /* no audio available — toggle still flips, just silent */
-    }
+    } catch (_) { /* silent if unavailable */ }
   },
   disable() { this.on = false; },
   play() {
@@ -152,154 +121,94 @@ const Chime = {
       gain.gain.exponentialRampToValueAtTime(0.25, start + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.16);
       osc.connect(gain).connect(this.ctx.destination);
-      osc.start(start);
-      osc.stop(start + 0.18);
+      osc.start(start); osc.stop(start + 0.18);
     });
   },
 };
 
 /* -------------------------------------------------------------- feed/state */
 
-/* Per-panel registry: id -> { el, sortMs, level }. `sortMs` is the reference
-   time — receivedAt/checkedInAt for count-up panels, appointmentAt for the
-   countdown panel. Cards are ordered by sortMs ascending, which puts the
-   oldest inquiry / soonest appointment first (top-left). */
+/* Per-panel registry: id -> { el, sortMs, level }. */
 const panels = {
   leads: { root: $("#leads"), items: new Map(), levels: INQUIRY_LEVELS, kind: "lead" },
   appts: { root: $("#appts"), items: new Map(), levels: null, kind: "appt" },
-  floor: { root: $("#floor"), items: new Map(), levels: FLOOR_LEVELS, kind: "floor" },
 };
 
-let lastOkMs = now(); // last successful poll — drives the stale indicator
-let hasLoaded = false; // becomes true after the first good poll
+let lastOkMs = now();
+let hasLoaded = false;
 
 /* -------------------------------------------------------------- rendering */
 
 function leadCardHTML(d) {
-  const rep = d.assignedTo
-    ? `<span class="meta-assignee">${esc(d.assignedTo)}</span>`
-    : `<span class="meta-assignee unassigned">Unassigned</span>`;
-  const n = Number(d.attempts) || 0;
-  const attempts = n === 0 ? "No attempts" : `${n} attempt${n === 1 ? "" : "s"}`;
   return `
-    <div class="card-head">
+    <div class="card-line1">
       <span class="card-name">${esc(d.name)}</span>
-      <span class="card-timer">--:--</span>
-    </div>
-    <div class="card-sub">
       <span class="badge">${esc(d.source || "—")}</span>
-      ${rep}
-      <span class="meta-side">${attempts}</span>
-    </div>`;
-}
-
-function floorCardHTML(d) {
-  const assoc = d.assignedTo
-    ? `<span class="meta-assignee">${esc(d.assignedTo)}</span>`
-    : `<span class="meta-assignee unassigned">Needs greeter</span>`;
-  return `
-    <div class="card-head">
-      <span class="card-name">${esc(d.party)}</span>
       <span class="card-timer">--:--</span>
     </div>
-    <div class="card-interest"><span class="lbl">Here for:</span> ${esc(d.interest || "—")}</div>
-    <div class="card-sub">
-      <span class="badge">👥 ${Number(d.headcount) || 1}</span>
-      ${assoc}
+    <div class="card-line2">
+      <span class="meta rep"></span>
+      <span class="sep">·</span>
+      <span class="meta attempts"></span>
     </div>`;
 }
 
 function apptCardHTML(d, appointmentMs) {
-  const assoc = d.assignedTo
-    ? `<span class="meta-assignee">${esc(d.assignedTo)}</span>`
-    : `<span class="meta-assignee unassigned">No associate</span>`;
-  const confirm = d.confirmed
-    ? `<span class="confirm-badge confirmed">✓ Confirmed</span>`
-    : `<span class="confirm-badge unconfirmed">Unconfirmed</span>`;
   return `
-    <div class="card-head">
+    <div class="card-line1">
       <span class="card-name">${esc(d.name)}</span>
       <span class="card-timer appt-time">${esc(fmtClock(appointmentMs))}</span>
     </div>
-    <div class="appt-row">
-      <span class="card-countdown">--:--</span>
-      <span class="card-status">—</span>
-    </div>
-    <div class="card-interest"><span class="lbl">Here for:</span> ${esc(d.interest || "—")}</div>
-    <div class="card-sub">
-      ${assoc}
-      ${confirm}
+    <div class="card-line2">
+      <span class="meta countdown"></span>
+      <span class="sep">·</span>
+      <span class="meta interest">${esc(d.interest || "—")}</span>
+      <span class="sep">·</span>
+      <span class="meta assoc"></span>
     </div>`;
 }
 
-function cardHTML(d, kind, sortMs) {
-  if (kind === "lead") return leadCardHTML(d);
-  if (kind === "floor") return floorCardHTML(d);
-  return apptCardHTML(d, sortMs);
+/** Set an assignee <span>, applying the red "alert" style when empty. */
+function setAssignee(el, sel, value, emptyLabel) {
+  const a = el.querySelector(sel);
+  if (value) { a.textContent = value; a.classList.remove("alert"); }
+  else { a.textContent = emptyLabel; a.classList.add("alert"); }
 }
 
-/** Update mutable text fields of an existing card in place. */
 function refreshCardFields(entry, d, kind) {
   const el = entry.el;
   if (kind === "lead") {
     el.querySelector(".card-name").textContent = d.name ?? "";
     el.querySelector(".badge").textContent = d.source || "—";
     const n = Number(d.attempts) || 0;
-    el.querySelector(".meta-side").textContent =
+    el.querySelector(".attempts").textContent =
       n === 0 ? "No attempts" : `${n} attempt${n === 1 ? "" : "s"}`;
-    setAssignee(el, d.assignedTo, "Unassigned");
-  } else if (kind === "floor") {
-    el.querySelector(".card-name").textContent = d.party ?? "";
-    el.querySelector(".badge").textContent = "👥 " + (Number(d.headcount) || 1);
-    el.querySelector(".card-interest").innerHTML =
-      `<span class="lbl">Here for:</span> ${esc(d.interest || "—")}`;
-    setAssignee(el, d.assignedTo, "Needs greeter");
+    setAssignee(el, ".rep", d.assignedTo, "UNASSIGNED");
   } else {
     el.querySelector(".card-name").textContent = d.name ?? "";
     el.querySelector(".appt-time").textContent = fmtClock(entry.sortMs);
-    el.querySelector(".card-interest").innerHTML =
-      `<span class="lbl">Here for:</span> ${esc(d.interest || "—")}`;
-    setAssignee(el, d.assignedTo, "No associate");
-    const cb = el.querySelector(".confirm-badge");
-    cb.textContent = d.confirmed ? "✓ Confirmed" : "Unconfirmed";
-    cb.className = "confirm-badge " + (d.confirmed ? "confirmed" : "unconfirmed");
+    el.querySelector(".interest").textContent = d.interest || "—";
+    setAssignee(el, ".assoc", d.assignedTo, "NO ASSOCIATE");
     el.classList.toggle("unconfirmed", !d.confirmed);
   }
 }
 
-function setAssignee(el, value, emptyLabel) {
-  const a = el.querySelector(".meta-assignee");
-  if (value) {
-    a.textContent = value;
-    a.classList.remove("unassigned");
-  } else {
-    a.textContent = emptyLabel;
-    a.classList.add("unassigned");
-  }
-}
-
-/** Reference time used for sorting + timers for a given record. */
 function refMs(d, kind) {
-  if (kind === "appt") return parseMs(d.appointmentAt);
-  if (kind === "floor") return parseMs(d.checkedInAt);
-  return parseMs(d.receivedAt);
+  return parseMs(kind === "appt" ? d.appointmentAt : d.receivedAt);
 }
 
-/** Diff incoming feed items against what's on screen for one panel. */
 function syncPanel(panel, list) {
   const incoming = new Map((list || []).map((d) => [String(d.id), d]));
 
-  // Remove cards no longer present — fade them out first.
   for (const [id, entry] of panel.items) {
     if (!incoming.has(id)) {
       const el = entry.el;
       el.classList.add("leaving");
       panel.items.delete(id);
-      setTimeout(() => el.remove(), 600);
+      setTimeout(() => el.remove(), 520);
     }
   }
 
-  // Add new cards / update existing ones.
   for (const [id, d] of incoming) {
     const sortMs = refMs(d, panel.kind);
     let entry = panel.items.get(id);
@@ -307,30 +216,51 @@ function syncPanel(panel, list) {
       const el = document.createElement("div");
       el.className = "card flash";
       if (panel.kind === "appt" && !d.confirmed) el.classList.add("unconfirmed");
-      el.innerHTML = cardHTML(d, panel.kind, sortMs);
+      el.innerHTML = panel.kind === "lead" ? leadCardHTML(d) : apptCardHTML(d, sortMs);
       setTimeout(() => el.classList.remove("flash"), 1300);
       entry = { el, sortMs };
       panel.items.set(id, entry);
       panel.root.appendChild(el);
+      refreshCardFields(entry, d, panel.kind);
     } else {
       entry.sortMs = sortMs;
       refreshCardFields(entry, d, panel.kind);
     }
   }
 
+  updatePanelTimers(panel); // paint colors/text before we sort by color
   reorder(panel);
-  updatePanelTimers(panel); // paint immediately, don't wait for the 1s tick
-  reflowOverflow(panel);
+  layoutRows(panel);
 }
 
-/** Ascending sortMs => oldest inquiry / soonest appointment first (top-left). */
+/** Sort by urgency color, not time alone.
+    Inquiries: longest wait first (oldest receivedAt).
+    Appointments: no-show → late → arriving → prep → later, then by time. */
 function reorder(panel) {
-  [...panel.items.values()]
-    .sort((a, b) => a.sortMs - b.sortMs)
-    .forEach((entry) => panel.root.appendChild(entry.el));
+  const t = now();
+  const entries = [...panel.items.values()];
+  if (panel.kind === "lead") {
+    entries.sort((a, b) => a.sortMs - b.sortMs);
+  } else {
+    const rank = (e) => appointmentLevel((e.sortMs - t) / 1000).rank;
+    entries.sort((a, b) => rank(a) - rank(b) || a.sortMs - b.sortMs);
+  }
+  entries.forEach((e) => panel.root.appendChild(e.el));
 }
 
-/** Apply an urgency level class, chiming on a genuine crossing into red. */
+/** Rows = card count, so cards share the panel height evenly (never overflow). */
+function layoutRows(panel) {
+  const live = [...panel.items.values()].filter(
+    (e) => !e.el.classList.contains("leaving"));
+  panel.root.querySelectorAll(".empty").forEach((n) => n.remove());
+  if (live.length === 0) {
+    panel.root.style.gridTemplateRows = "1fr";
+    panel.root.appendChild(emptyState(panel.kind));
+  } else {
+    panel.root.style.gridTemplateRows = `repeat(${live.length}, minmax(0, 1fr))`;
+  }
+}
+
 function applyLevel(entry, level) {
   if (level === entry.level) return;
   const prev = entry.level;
@@ -340,17 +270,21 @@ function applyLevel(entry, level) {
   if (level === "red" && prev && prev !== "red") Chime.play();
 }
 
-/** Recompute timers/countdowns + urgency level for every card in a panel. */
 function updatePanelTimers(panel) {
   const t = now();
   for (const entry of panel.items.values()) {
     if (entry.el.classList.contains("leaving")) continue;
     if (panel.kind === "appt") {
       const remaining = (entry.sortMs - t) / 1000;
-      entry.el.querySelector(".card-countdown").textContent = fmtCountdown(remaining);
-      const { level, label } = appointmentLevel(remaining);
-      entry.el.querySelector(".card-status").textContent = label;
-      applyLevel(entry, level);
+      const cd = entry.el.querySelector(".countdown");
+      if (remaining >= 0) {
+        cd.textContent = `in ${fmtCountBody(remaining)}`;
+        cd.classList.remove("alert");
+      } else {
+        cd.textContent = `${fmtCountBody(remaining)} late`;
+        cd.classList.add("alert");
+      }
+      applyLevel(entry, appointmentLevel(remaining).level);
     } else {
       const ageSec = (t - entry.sortMs) / 1000;
       entry.el.querySelector(".card-timer").textContent = fmtTimer(ageSec);
@@ -359,45 +293,18 @@ function updatePanelTimers(panel) {
   }
 }
 
-/** Hide the least-urgent overflow rather than shrinking text; show a "+N" chip. */
-function reflowOverflow(panel) {
-  const root = panel.root;
-  root.querySelectorAll(".overflow-chip, .empty").forEach((n) => n.remove());
-  const cards = [...root.querySelectorAll(".card:not(.leaving)")];
-
-  if (cards.length === 0) {
-    root.appendChild(emptyState(panel.kind));
-    return;
-  }
-  cards.forEach((c) => (c.style.display = ""));
-  let hidden = 0;
-  for (let i = cards.length - 1; i >= 1; i--) {
-    if (root.scrollHeight <= root.clientHeight + 1) break;
-    cards[i].style.display = "none";
-    hidden++;
-  }
-  if (hidden > 0) {
-    const chip = document.createElement("div");
-    chip.className = "overflow-chip";
-    chip.textContent = `+${hidden} more`;
-    root.appendChild(chip);
-  }
-}
-
 function emptyState(kind) {
   const el = document.createElement("div");
   el.className = "empty";
   if (!hasLoaded) {
     el.innerHTML = `<div class="em-ic">📡</div>
-      <div class="em-title" style="color:var(--ink-dim)">Connecting…</div>
+      <div class="em-title" style="color:var(--ink-soft)">Connecting…</div>
       <div class="em-sub">Waiting for the first update</div>`;
     return el;
   }
-  const copy = {
-    lead: ["✅", "All caught up", "No leads awaiting a callback"],
-    appt: ["📅", "No appointments left", "Nothing else booked for today"],
-    floor: ["🛋️", "All caught up", "No customers on the floor right now"],
-  }[kind];
+  const copy = kind === "lead"
+    ? ["✅", "All caught up", "No leads awaiting a callback"]
+    : ["📅", "Nothing booked", "No more appointments today"];
   el.innerHTML = `<div class="em-ic">${copy[0]}</div>
     <div class="em-title">${copy[1]}</div>
     <div class="em-sub">${copy[2]}</div>`;
@@ -408,17 +315,13 @@ function emptyState(kind) {
 
 function updateHeaderCounts(data, apptsTodayCount) {
   const awaiting = (data.inquiries || []).length;
-  const onFloor = (data.floor || []).length;
   const total = data.stats && Number.isFinite(data.stats.inquiriesToday)
-    ? data.stats.inquiriesToday
-    : awaiting;
+    ? data.stats.inquiriesToday : awaiting;
   $("#count-awaiting").textContent = awaiting;
   $("#count-appts").textContent = apptsTodayCount;
-  $("#count-floor").textContent = onFloor;
   $("#count-total").textContent = total;
   $("#panel-leads-count").textContent = awaiting;
   $("#panel-appts-count").textContent = apptsTodayCount;
-  $("#panel-floor-count").textContent = onFloor;
 }
 
 function updateTomorrowChip(n) {
@@ -429,8 +332,7 @@ function updateTomorrowChip(n) {
 
 function updateClock() {
   $("#clock").textContent = new Date().toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit",
+    hour: "numeric", minute: "2-digit",
   });
 }
 
@@ -440,8 +342,6 @@ function updateStale() {
 
 /* --------------------------------------------------------------- lifecycle */
 
-/** Split appointments into today's cards vs a tomorrow count. Arrived
-    appointments are on the floor now, so they drop out of this panel. */
 function bucketAppointments(appts) {
   const todayKey = dayKey(now());
   const tomKey = dayKey(now() + 86400000);
@@ -468,23 +368,20 @@ async function poll() {
     const { today, tomorrow } = bucketAppointments(data.appointments);
     syncPanel(panels.leads, data.inquiries);
     syncPanel(panels.appts, today);
-    syncPanel(panels.floor, data.floor);
     updateHeaderCounts(data, today.length);
     updateTomorrowChip(tomorrow);
     updateStale();
   } catch (err) {
-    // Never blank the screen: keep the last data on-screen, timers keep
-    // ticking, and the stale indicator appears once we cross the threshold.
     console.warn("Feed poll failed:", err.message);
     updateStale();
   }
 }
 
-/** One-second heartbeat: timers, countdowns, clock, colors, stale — no network. */
+/** One-second heartbeat: timers, countdowns, re-sort by color, clock, stale. */
 function tick() {
   updatePanelTimers(panels.leads);
   updatePanelTimers(panels.appts);
-  updatePanelTimers(panels.floor);
+  reorder(panels.appts); // appointment urgency order shifts as the clock moves
   updateClock();
   updateStale();
 }
@@ -498,11 +395,9 @@ async function loadConfig() {
       if (c.staleSeconds) CONFIG.staleSeconds = c.staleSeconds;
       if (c.storeName) CONFIG.storeName = c.storeName;
     }
-  } catch (_) {
-    /* fall back to defaults */
-  }
+  } catch (_) { /* defaults */ }
   $("#store-name").textContent = CONFIG.storeName;
-  document.title = CONFIG.storeName + " — Lead & Floor Board";
+  document.title = CONFIG.storeName + " — Board";
 }
 
 function wireChimeToggle() {
@@ -520,25 +415,25 @@ function wireChimeToggle() {
   });
 }
 
+/** Scale the fixed 1920x1080 canvas to fit the display, centered. */
+function fitStage() {
+  const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+  document.getElementById("stage").style.setProperty("--scale", s);
+}
+
 async function main() {
+  fitStage();
+  window.addEventListener("resize", fitStage);
   wireChimeToggle();
   updateClock();
-  // Render initial "Connecting…" states so the screen is never blank.
-  reflowOverflow(panels.leads);
-  reflowOverflow(panels.appts);
-  reflowOverflow(panels.floor);
+  layoutRows(panels.leads);
+  layoutRows(panels.appts);
 
   await loadConfig();
   await poll();
 
   setInterval(poll, CONFIG.pollSeconds * 1000);
   setInterval(tick, 1000);
-
-  window.addEventListener("resize", () => {
-    reflowOverflow(panels.leads);
-    reflowOverflow(panels.appts);
-    reflowOverflow(panels.floor);
-  });
 }
 
 main();

@@ -3,7 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Lead &amp; Floor Board</title>
+    <title>Lead &amp; Appointment Board</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/static/board.css" />
     <link
       rel="icon"
@@ -11,71 +17,61 @@
     />
   </head>
   <body>
-    <!-- Corner indicator: only visible when the feed goes stale. -->
-    <div id="stale" class="stale" hidden>
-      <span class="dot"></span> Connection lost
+    <!-- Everything renders on a fixed 1920x1080 canvas, then scales to fit. -->
+    <div id="stage">
+      <header class="topbar">
+        <div class="brand">
+          <span class="paw">🐾</span>
+          <span id="store-name" class="store-name">Lead &amp; Appointment Board</span>
+        </div>
+
+        <div class="counters">
+          <div class="counter counter-lead">
+            <span class="counter-num" id="count-awaiting">0</span>
+            <span class="counter-lbl">Awaiting Call</span>
+          </div>
+          <div class="counter counter-appt">
+            <span class="counter-num" id="count-appts">0</span>
+            <span class="counter-lbl">Appts Today</span>
+          </div>
+          <div class="counter counter-total">
+            <span class="counter-num" id="count-total">0</span>
+            <span class="counter-lbl">Inquiries Today</span>
+          </div>
+        </div>
+
+        <div class="clockbox">
+          <span id="clock" class="clock">--:--</span>
+          <button id="chime-toggle" class="chime-toggle" type="button"
+                  aria-pressed="false" title="Chime when a card turns red">
+            <span class="chime-ic">🔕</span>
+          </button>
+        </div>
+      </header>
+
+      <main class="board">
+        <section class="panel panel-leads">
+          <h2 class="panel-title">
+            <span class="pt-name">New Inquiries</span>
+            <span class="panel-count" id="panel-leads-count">0</span>
+          </h2>
+          <div class="cards" id="leads"></div>
+        </section>
+
+        <section class="panel panel-appts">
+          <h2 class="panel-title">
+            <span class="pt-name">Appointments Today</span>
+            <span class="panel-count" id="panel-appts-count">0</span>
+            <span class="pt-aside" id="appts-tomorrow" hidden>Tomorrow: 0</span>
+          </h2>
+          <div class="cards" id="appts"></div>
+        </section>
+      </main>
+
+      <div id="stale" class="stale" hidden>
+        <span class="dot"></span> Connection lost
+      </div>
     </div>
-
-    <header class="topbar">
-      <div class="brand">
-        <span class="paw">🐾</span>
-        <span id="store-name" class="store-name">Lead &amp; Floor Board</span>
-      </div>
-
-      <div class="counters">
-        <div class="counter counter-lead">
-          <span class="counter-num" id="count-awaiting">0</span>
-          <span class="counter-lbl">Awaiting Call</span>
-        </div>
-        <div class="counter counter-appt">
-          <span class="counter-num" id="count-appts">0</span>
-          <span class="counter-lbl">Appts Today</span>
-        </div>
-        <div class="counter counter-floor">
-          <span class="counter-num" id="count-floor">0</span>
-          <span class="counter-lbl">On Floor</span>
-        </div>
-        <div class="counter counter-total">
-          <span class="counter-num" id="count-total">0</span>
-          <span class="counter-lbl">Inquiries Today</span>
-        </div>
-      </div>
-
-      <div class="clockbox">
-        <span id="clock" class="clock">--:--</span>
-        <button id="chime-toggle" class="chime-toggle" type="button"
-                aria-pressed="false" title="Chime when a card turns red">
-          <span class="chime-ic">🔕</span>
-        </button>
-      </div>
-    </header>
-
-    <main class="board">
-      <section class="panel panel-leads">
-        <h2 class="panel-title">
-          <span class="pt-name">New Inquiries</span>
-          <span class="panel-count" id="panel-leads-count">0</span>
-        </h2>
-        <div class="cards" id="leads"></div>
-      </section>
-
-      <section class="panel panel-appts">
-        <h2 class="panel-title">
-          <span class="pt-name">Appointments Today</span>
-          <span class="panel-count" id="panel-appts-count">0</span>
-          <span class="pt-aside" id="appts-tomorrow" hidden>Tomorrow: 0</span>
-        </h2>
-        <div class="cards" id="appts"></div>
-      </section>
-
-      <section class="panel panel-floor">
-        <h2 class="panel-title">
-          <span class="pt-name">On the Floor</span>
-          <span class="panel-count" id="panel-floor-count">0</span>
-        </h2>
-        <div class="cards" id="floor"></div>
-      </section>
-    </main>
 
     <script src="/static/board.js"></script>
   </body>

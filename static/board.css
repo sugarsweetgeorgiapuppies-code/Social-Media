@@ -1,144 +1,155 @@
 /* ============================================================================
-   Lead & Floor Board — wall-mounted showroom TV display
-   Light, cheerful theme with vivid color-coded cards. Designed for 1920x1080
-   landscape, viewed from 10–15 ft. Smallest text is 20px at 1080p; the timer
-   sits right next to the name and is the biggest element on every card.
-   Zero hover states, zero touch — nothing here reacts to a pointer.
+   Lead & Appointment Board — warm, friendly wall display
+   ----------------------------------------------------------------------------
+   Everything is laid out on a FIXED 1920x1080 canvas (#stage) using fixed px
+   sizes — no viewport-derived fonts. board.js scales the whole canvas with a
+   CSS transform to fit whatever display it's on, centered, letterboxed in the
+   cream background. Nothing clips or scrolls.
+
+   Two panels, 50% each: New Inquiries (count-up) and Appointments (countdown).
+   Each panel's card list is a CSS grid whose rows are repeat(N, minmax(0,1fr))
+   so cards share the panel height evenly and shrink rather than overflow.
    ============================================================================ */
 
 :root {
-  --bg: #eef2f8;
-  --panel-bg: #ffffff;
-  --panel-line: #d7deea;
-  --header-bg: #ffffff;
-  --ink: #16202e;
-  --ink-dim: #5c6a7e;
+  --cream: #faf3ef;
+  --panel: #ffffff;
+  --line: #ece2db;
+  --ink: #3a2e2a;      /* warm near-black for names/titles */
+  --ink-soft: #6b5e58; /* metadata */
+  --alert: #c0392b;    /* the only red words: UNASSIGNED / NO ASSOCIATE / late */
 
-  /* Vivid urgency palette — bright fill / strong border / dark timer ink.
-     Dark text on bright fills stays high-contrast from across the room. */
-  --calm-bg: #c9f7dd;      --calm-bd: #16a35a;      --calm-ink: #0b7a43;
-  --green-bg: #b8f5cf;     --green-bd: #12b25c;     --green-ink: #0a7a3f;
-  --neutral-bg: #e7ecf4;   --neutral-bd: #93a4bd;   --neutral-ink: #3a4a5e;
-  --blue-bg: #d3e4ff;      --blue-bd: #2f6bdf;      --blue-ink: #1c4bb0;
-  --amber-bg: #ffe7a0;     --amber-bd: #e2a70f;     --amber-ink: #8a5e00;
-  --orange-bg: #ffd0a6;    --orange-bd: #ef7615;    --orange-ink: #a8430a;
-  --red-bg: #ffc6cb;       --red-bd: #e23b46;       --red-ink: #b3121d;
+  /* Card palette: border color / tinted background / readable ink. */
+  --green-bd: #4fbf88;   --green-bg: #e6f6ee;   --green-ink: #2e9a63;
+  --blue-bd: #29c2e8;    --blue-bg: #ddf3fb;    --blue-ink: #1595b5;
+  --blush-bd: #e0a091;   --blush-bg: #f8ebe7;   --blush-ink: #b9705f;
+  --orange-bd: #e8873f;  --orange-bg: #fbebdd;  --orange-ink: #c4671f;
+  --red-bd: #d65a5a;     --red-bg: #fbe5e5;     --red-ink: #b23b3b;
+  --neutral-bd: #cfc5c0; --neutral-bg: #f3eeeb; --neutral-ink: #8a7f79;
 
-  --lead-accent: #2563eb;
-  --appt-accent: #0891b2;
-  --floor-accent: #7c3aed;
+  --font-display: "Baloo 2", "Segoe UI Rounded", system-ui, sans-serif;
+  --font-body: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
   height: 100%;
-  background: var(--bg);
+  background: var(--cream);
+  font-family: var(--font-body);
   color: var(--ink);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-    Arial, sans-serif;
-  overflow: hidden; /* wall display — never scrolls */
+  overflow: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
-body { display: flex; flex-direction: column; }
+/* The fixed canvas, centered and scaled by --scale (set in JS). */
+#stage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1920px;
+  height: 1080px;
+  transform: translate(-50%, -50%) scale(var(--scale, 1));
+  transform-origin: center center;
+  display: flex;
+  flex-direction: column;
+  background: var(--cream);
+}
 
 /* ------------------------------------------------------------- header bar */
 .topbar {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
-  padding: 10px 28px;
-  background: var(--header-bg);
-  border-bottom: 2px solid var(--panel-line);
-  box-shadow: 0 2px 10px rgba(22, 32, 46, 0.06);
-  flex: 0 0 auto;
+  gap: 28px;
+  height: 104px;
+  padding: 0 40px;
 }
-
-.brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
-.paw { font-size: 40px; line-height: 1; }
+.brand { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.paw { font-size: 46px; line-height: 1; }
 .store-name {
-  font-size: 34px;
+  font-family: var(--font-display);
+  font-size: 40px;
   font-weight: 800;
-  letter-spacing: 0.3px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.counters { display: flex; gap: 16px; }
+.counters { display: flex; gap: 18px; }
 .counter {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 4px 18px;
-  border-radius: 14px;
-  background: #f3f6fb;
-  border: 2px solid var(--panel-line);
-  min-width: 124px;
+  min-width: 138px;
+  padding: 8px 20px;
+  background: var(--panel);
+  border: 2px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 4px 14px rgba(58, 46, 42, 0.06);
 }
-.counter-num { font-size: 38px; font-weight: 800; line-height: 1; }
+.counter-num {
+  font-family: var(--font-display);
+  font-size: 44px;
+  font-weight: 800;
+  line-height: 1;
+}
 .counter-lbl {
   font-size: 20px;
-  color: var(--ink-dim);
+  font-weight: 700;
+  color: var(--ink-soft);
   margin-top: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
-.counter-lead .counter-num { color: var(--lead-accent); }
-.counter-floor .counter-num { color: var(--floor-accent); }
+.counter-lead .counter-num { color: var(--green-ink); }
+.counter-appt .counter-num { color: var(--blue-ink); }
 .counter-total .counter-num { color: var(--ink); }
 
 .clockbox { display: flex; align-items: center; gap: 16px; }
 .clock {
-  font-size: 40px;
+  font-family: var(--font-display);
+  font-size: 42px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 1px;
 }
 .chime-toggle {
-  border: 2px solid var(--panel-line);
-  background: #f3f6fb;
-  color: var(--ink);
-  border-radius: 12px;
-  width: 56px;
-  height: 56px;
-  font-size: 26px;
+  width: 60px;
+  height: 60px;
+  border: 2px solid var(--line);
+  background: var(--panel);
+  border-radius: 16px;
+  font-size: 28px;
   cursor: pointer;
   display: grid;
   place-items: center;
+  box-shadow: 0 4px 14px rgba(58, 46, 42, 0.06);
 }
 .chime-toggle[aria-pressed="true"] {
-  border-color: var(--calm-bd);
-  background: var(--calm-bg);
+  border-color: var(--green-bd);
+  background: var(--green-bg);
 }
 
 /* --------------------------------------------------------- stale indicator */
 .stale {
-  position: fixed;
-  bottom: 18px;
-  right: 18px;
-  z-index: 50;
+  position: absolute;
+  bottom: 22px;
+  right: 26px;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 18px;
-  border-radius: 12px;
-  background: #fff3cd;
-  border: 2px solid #d9a406;
-  color: #7a5b00;
+  padding: 10px 20px;
+  border-radius: 14px;
+  background: #fff3d6;
+  border: 3px solid #e6a91d;
+  color: #97711a;
   font-size: 22px;
-  font-weight: 700;
-  box-shadow: 0 6px 24px rgba(22, 32, 46, 0.18);
+  font-weight: 800;
+  box-shadow: 0 8px 26px rgba(58, 46, 42, 0.18);
 }
-/* The hidden attribute must win over the flex display above. */
 .stale[hidden] { display: none; }
 .stale .dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #d9a406;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #e6a91d;
   animation: blink 1.4s ease-in-out infinite;
 }
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
@@ -146,274 +157,199 @@ body { display: flex; flex-direction: column; }
 /* ----------------------------------------------------------- board layout */
 .board {
   flex: 1 1 auto;
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 0;
   min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  padding: 8px 32px 28px;
 }
 .panel {
-  display: flex;
-  flex-direction: column;
   min-height: 0;
   min-width: 0;
-  padding: 16px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 2px solid var(--line);
+  border-radius: 26px;
+  padding: 18px 20px 20px;
+  box-shadow: 0 8px 24px rgba(58, 46, 42, 0.06);
 }
-.panel-leads,
-.panel-appts { border-right: 2px solid var(--panel-line); }
-
 .panel-title {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 14px;
-  font-size: 26px;
+  font-family: var(--font-display);
+  font-size: 36px;
   font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 1.2px;
-  color: var(--ink-dim);
-  padding-bottom: 12px;
-  margin-bottom: 8px;
-  border-bottom: 2px solid var(--panel-line);
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 3px solid var(--line);
 }
-.panel-leads .panel-title { color: var(--lead-accent); }
-.panel-appts .panel-title { color: var(--appt-accent); }
-.panel-floor .panel-title { color: var(--floor-accent); }
+.panel-leads .panel-title { color: var(--green-ink); }
+.panel-appts .panel-title { color: var(--blue-ink); }
 .panel-count {
-  font-size: 22px;
-  background: #f3f6fb;
-  border: 2px solid var(--panel-line);
-  border-radius: 10px;
-  padding: 2px 12px;
+  font-family: var(--font-body);
+  font-size: 24px;
+  font-weight: 800;
   color: var(--ink);
+  background: var(--cream);
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 16px;
 }
-/* "Tomorrow: N" chip pushed to the right of the appointments panel title. */
 .pt-aside {
   margin-left: auto;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
-  color: var(--ink-dim);
-  background: #f3f6fb;
-  border: 2px solid var(--panel-line);
+  color: var(--ink-soft);
+  background: var(--cream);
+  border: 2px solid var(--line);
   border-radius: 999px;
-  padding: 2px 14px;
-  text-transform: none;
-  letter-spacing: 0;
+  padding: 3px 16px;
 }
 .pt-aside[hidden] { display: none; }
 
-/* Cards grid: auto-fill so 2 cards look right and 14 cards still fit without
-   shrinking text. Extra beyond what fits is handled by the "+N more" chip. */
+/* Card list: one column, N evenly-sized rows so cards never overflow. */
 .cards {
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  grid-auto-rows: min-content;
-  gap: 12px;
-  align-content: start;
-  overflow: hidden;
-  position: relative;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr; /* overwritten to repeat(N, minmax(0,1fr)) in JS */
+  gap: 14px;
 }
 
 /* ------------------------------------------------------------------ cards */
 .card {
-  border-radius: 16px;
-  border: 3px solid var(--neutral-bd);
-  background: var(--neutral-bg);
-  padding: 9px 15px 10px;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  box-shadow: 0 3px 10px rgba(22, 32, 46, 0.08);
-  transition: background 0.6s ease, border-color 0.6s ease;
-  animation: cardIn 0.5s ease both;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 22px;
+  border-radius: 22px;
+  border: 4px solid var(--neutral-bd);
+  background: var(--neutral-bg);
+  box-shadow: 0 5px 14px rgba(58, 46, 42, 0.1);
+  transition: background 0.5s ease, border-color 0.5s ease;
+  animation: cardIn 0.45s ease both;
 }
-
-/* Slide-in with a brief highlight flash for brand-new cards. */
 @keyframes cardIn {
-  0%   { opacity: 0; transform: translateY(-14px) scale(0.98); }
+  0% { opacity: 0; transform: translateY(-10px); }
   100% { opacity: 1; transform: none; }
 }
-.card.flash { animation: cardIn 0.5s ease both, flash 1.1s ease-out 0.1s; }
+.card.flash { animation: cardIn 0.45s ease both, flash 1.1s ease-out 0.1s; }
 @keyframes flash {
-  0%   { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.0); }
-  25%  { box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.45); }
-  100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.0); }
+  0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+  25% { box-shadow: 0 0 0 7px rgba(255, 255, 255, 0.75); }
+  100% { box-shadow: 0 5px 14px rgba(58, 46, 42, 0.1); }
 }
+.card.leaving { animation: cardOut 0.5s ease forwards; }
+@keyframes cardOut { to { opacity: 0; transform: scale(0.95); } }
 
-/* Resolved cards fade out before removal. */
-.card.leaving {
-  animation: cardOut 0.55s ease forwards;
-  pointer-events: none;
-}
-@keyframes cardOut {
-  to { opacity: 0; transform: scale(0.94); }
-}
-
-/* Top row: NAME first, TIMER right next to it. Timer is the biggest element. */
-.card-head {
+/* Line 1: name · badge · timer(right). Line 2: metadata. */
+.card-line1 {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
   gap: 14px;
+  min-width: 0;
 }
 .card-name {
-  font-size: 29px;
-  font-weight: 800;
-  line-height: 1.05;
+  font-family: var(--font-display);
+  font-size: 38px;
+  font-weight: 700;
+  line-height: 1.02;
   color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.card-timer {
-  flex: 0 0 auto;
-  font-size: 46px;
-  font-weight: 800;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 1px;
-}
-
-.card-sub {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 22px;
-  font-weight: 600;
+  min-width: 0;
 }
 .badge {
   flex: 0 0 auto;
   font-size: 20px;
   font-weight: 800;
-  padding: 3px 12px;
+  padding: 2px 12px;
   border-radius: 999px;
-  background: rgba(22, 32, 46, 0.09);
-  border: 2px solid rgba(22, 32, 46, 0.16);
-  color: var(--ink);
+  background: rgba(58, 46, 42, 0.08);
+  color: var(--ink-soft);
   white-space: nowrap;
 }
-.meta-assignee { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.meta-assignee.unassigned {
-  color: #c01722;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
-.meta-side { margin-left: auto; flex: 0 0 auto; color: var(--ink-dim); }
-
-.card-interest {
-  font-size: 22px;
-  color: var(--ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.card-interest .lbl { color: var(--ink-dim); }
-
-/* --- appointment card extras --------------------------------------------- */
-.appt-time { font-size: 40px; } /* the clock time, still the biggest element */
-.appt-row {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  font-weight: 700;
-}
-.card-countdown {
-  font-size: 24px;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink);
-}
-.card-status {
-  font-size: 22px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-left: auto;
-}
-.confirm-badge {
+.card-timer {
   flex: 0 0 auto;
   margin-left: auto;
-  font-size: 20px;
+  font-family: var(--font-display);
+  font-size: 62px;
   font-weight: 800;
-  padding: 3px 12px;
-  border-radius: 999px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.appt-time { font-size: 60px; }
+
+.card-line2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  min-width: 0;
+}
+.card-line2 .meta {
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.confirm-badge.confirmed { color: var(--calm-ink); background: rgba(22, 163, 90, 0.16); }
-.confirm-badge.unconfirmed { color: #b3121d; background: rgba(226, 59, 70, 0.15); }
+.card-line2 .interest { min-width: 0; } /* the flexible one that ellipsizes */
+.card-line2 .sep { flex: 0 0 auto; color: var(--line); font-weight: 800; }
+.meta.alert { color: var(--alert); font-weight: 800; }
 
-/* Unconfirmed appointments carry a persistent dashed outline accent all day,
-   regardless of the countdown color, so staff can spot them early. */
-.card.unconfirmed { outline: 3px dashed #e2731a; outline-offset: 3px; }
-
-/* Colored status text tracks the countdown level. */
-.card.lvl-neutral .card-status { color: var(--neutral-ink); }
-.card.lvl-blue    .card-status { color: var(--blue-ink); }
-.card.lvl-green   .card-status { color: var(--green-ink); }
-.card.lvl-amber   .card-status { color: var(--amber-ink); }
-.card.lvl-red     .card-status { color: var(--red-ink); }
-
-/* --- urgency levels: background, border, and timer ink -------------------- */
-.card.lvl-calm    { background: var(--calm-bg);    border-color: var(--calm-bd); }
-.card.lvl-calm    .card-timer { color: var(--calm-ink); }
-.card.lvl-green   { background: var(--green-bg);   border-color: var(--green-bd); }
+/* --- urgency colors ------------------------------------------------------- */
+.card.lvl-green   { border-color: var(--green-bd);   background: var(--green-bg); }
 .card.lvl-green   .card-timer { color: var(--green-ink); }
-.card.lvl-neutral { background: var(--neutral-bg); border-color: var(--neutral-bd); }
-.card.lvl-neutral .card-timer { color: var(--neutral-ink); }
-.card.lvl-blue    { background: var(--blue-bg);    border-color: var(--blue-bd); }
+.card.lvl-blue    { border-color: var(--blue-bd);    background: var(--blue-bg); }
 .card.lvl-blue    .card-timer { color: var(--blue-ink); }
-.card.lvl-amber   { background: var(--amber-bg);   border-color: var(--amber-bd); }
-.card.lvl-amber   .card-timer { color: var(--amber-ink); }
-.card.lvl-orange  { background: var(--orange-bg);  border-color: var(--orange-bd); }
+.card.lvl-blush   { border-color: var(--blush-bd);   background: var(--blush-bg); }
+.card.lvl-blush   .card-timer { color: var(--blush-ink); }
+.card.lvl-orange  { border-color: var(--orange-bd);  background: var(--orange-bg); }
 .card.lvl-orange  .card-timer { color: var(--orange-ink); }
-.card.lvl-red     { background: var(--red-bg);     border-color: var(--red-bd); }
+.card.lvl-red     { border-color: var(--red-bd);     background: var(--red-bg); }
 .card.lvl-red     .card-timer { color: var(--red-ink); }
+.card.lvl-neutral { border-color: var(--neutral-bd); background: var(--neutral-bg); }
+.card.lvl-neutral .card-timer { color: var(--neutral-ink); }
 
-/* Red gets a slow pulse so it draws the eye across the room. */
-.card.lvl-red { animation: redPulse 1.8s ease-in-out infinite; }
+/* Red gets a soft slow pulse so it reads from across the room. */
+.card.lvl-red { animation: redPulse 1.9s ease-in-out infinite; }
 @keyframes redPulse {
-  0%, 100% {
-    box-shadow: 0 3px 10px rgba(226, 59, 70, 0.25);
-    border-color: var(--red-bd);
-  }
-  50% {
-    box-shadow: 0 0 26px 5px rgba(226, 59, 70, 0.6);
-    border-color: #ff2f3c;
-  }
+  0%, 100% { box-shadow: 0 5px 14px rgba(214, 90, 90, 0.25); }
+  50% { box-shadow: 0 0 26px 5px rgba(214, 90, 90, 0.55); }
 }
+
+/* Unconfirmed appointments: dashed border (no separate badge). */
+.card.unconfirmed { border-style: dashed; }
 
 /* ------------------------------------------------------------- empty state */
 .empty {
-  grid-column: 1 / -1;
+  grid-row: 1 / -1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 12px;
-  height: 100%;
-  color: var(--ink-dim);
+  color: var(--ink-soft);
   text-align: center;
 }
-.empty .em-ic { font-size: 72px; }
-.empty .em-title { font-size: 34px; font-weight: 800; color: var(--calm-ink); }
-.empty .em-sub { font-size: 22px; }
-
-/* --------------------------------------------------------- overflow "+N" */
-.overflow-chip {
-  grid-column: 1 / -1;
-  justify-self: center;
-  margin-top: 4px;
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--ink-dim);
-  background: #f3f6fb;
-  border: 2px solid var(--panel-line);
-  border-radius: 999px;
-  padding: 6px 20px;
+.empty .em-ic { font-size: 76px; }
+.empty .em-title {
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-weight: 800;
+  color: var(--green-ink);
 }
+.empty .em-sub { font-size: 22px; font-weight: 600; }
 
-/* Respect reduced-motion preferences (kiosks rarely set it, but harmless). */
 @media (prefers-reduced-motion: reduce) {
   .card, .card.lvl-red, .stale .dot { animation: none; }
 }
