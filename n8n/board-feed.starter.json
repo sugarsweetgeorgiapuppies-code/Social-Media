@@ -1,0 +1,51 @@
+{
+  "name": "Lead & Floor Board — Feed (Stage 1: static test)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "board-feed",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Board polls this (GET)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 300],
+      "webhookId": "board-feed"
+    },
+    {
+      "parameters": {
+        "jsCode": "// STAGE 1: return static sample data in the board's shape.\n// Replace this node with real GoHighLevel HTTP Request nodes in Stage 2.\nconst now = new Date();\nconst iso = (minsAgo) => new Date(now.getTime() - minsAgo * 60000).toISOString();\nconst at  = (minsFromNow) => new Date(now.getTime() + minsFromNow * 60000).toISOString();\n\nreturn [{ json: {\n  inquiries: [\n    { id: \"t-inq-1\", name: \"Sarah M.\", source: \"Web Form\", receivedAt: iso(2),  assignedTo: \"Jenna\",  attempts: 0 },\n    { id: \"t-inq-2\", name: \"David R.\", source: \"Facebook\", receivedAt: iso(12), assignedTo: null,      attempts: 1 },\n    { id: \"t-inq-3\", name: \"Marcus T.\",source: \"Phone\",    receivedAt: iso(34), assignedTo: \"Dana\",   attempts: 3 }\n  ],\n  appointments: [\n    { id: \"t-appt-1\", name: \"Chen Family\", appointmentAt: at(45),  interest: \"Cavapoo - Pepper\",  assignedTo: \"Marcus\", confirmed: true,  arrived: false },\n    { id: \"t-appt-2\", name: \"The Bakers\",  appointmentAt: at(8),   interest: \"Goldendoodle - Biscuit\", assignedTo: \"Rosa\", confirmed: false, arrived: false },\n    { id: \"t-appt-3\", name: \"Ms. Whitfield\", appointmentAt: at(-22), interest: \"Maltipoo - Coconut\", assignedTo: \"Ben\", confirmed: true, arrived: false }\n  ],\n  floor: [\n    { id: \"t-flr-1\", party: \"Rodriguez\", headcount: 4, checkedInAt: iso(5),  interest: \"Goldendoodle - Biscuit\", assignedTo: \"Kayla\" },\n    { id: \"t-flr-2\", party: \"Johnson\",   headcount: 2, checkedInAt: iso(44), interest: \"Maltipoo - Coconut\",     assignedTo: null }\n  ],\n  generatedAt: now.toISOString(),\n  stats: { inquiriesToday: 24 }\n} }];"
+      },
+      "id": "build-feed",
+      "name": "Build feed JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Return to board",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [780, 300]
+    }
+  ],
+  "connections": {
+    "Board polls this (GET)": {
+      "main": [[{ "node": "Build feed JSON", "type": "main", "index": 0 }]]
+    },
+    "Build feed JSON": {
+      "main": [[{ "node": "Return to board", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {},
+  "active": false
+}
