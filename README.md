@@ -74,7 +74,8 @@ cp .env.example .env
 
 # 3. Run
 python run.py
-#   Open http://localhost:8000
+#   Dashboard:          http://localhost:8000
+#   Lead & Floor Board: http://localhost:8000/board   (wall-TV display; mock feed by default)
 ```
 
 Then click **“Run research now”** in the top bar to have your social media
@@ -123,6 +124,89 @@ All settings live in `.env` (see `.env.example` for the annotated list):
 | `DAILY_RUN_TIME` | `07:00` | Local time for the daily research job. |
 | `TIMEZONE` | `America/New_York` | Timezone for the scheduler. |
 | `LOG_LEVEL` | `INFO` | Logging verbosity. |
+| `BOARD_FEED_URL` | _(empty)_ | JSON feed for the Lead & Floor Board (an n8n webhook). Empty ⇒ dev/mock mode. |
+| `BOARD_DEV_MODE` | auto | Force mock feed on/off. Auto = on when `BOARD_FEED_URL` is empty. |
+| `BOARD_STORE_NAME` | business name | Store name in the board header. |
+| `BOARD_POLL_SECONDS` | `15` | How often the board re-polls the feed. |
+| `BOARD_STALE_SECONDS` | `90` | No successful poll within this ⇒ "connection lost". |
+| `BOARD_FEED_TIMEOUT` | `10` | Upstream feed timeout (seconds). |
+
+---
+
+## The Lead & Floor Board (wall-display at `/board`)
+
+A separate full-screen board for a wall-mounted TV in the showroom, built so
+staff can tell from 10–15 ft away who needs a callback, which appointments are
+about to arrive (or have gone no-show), and how long walk-ins have been waiting.
+Open it at **`http://localhost:8000/board`**. Designed for 1920×1080 landscape,
+no touch, no glare-heavy dark screen — light background with vivid color-coded
+cards.
+
+**Three panels, following the customer lifecycle:**
+
+1. **New Inquiries** — leads awaiting first contact. Count-up timer since the
+   inquiry arrived; longer = worse.
+2. **Appointments Today** — booked appointments, soonest first, with a live
+   **countdown** to the appointment time and a confirmed/unconfirmed indicator.
+   Tomorrow's bookings show as a small "Tomorrow: N" chip in the header.
+3. **On the Floor** — customers in the store now. Count-up timer since check-in.
+
+**Urgency colors** shift a card's background + border by time. Every threshold
+is a named constant at the top of [`static/board.js`](static/board.js) so you
+can tune the bands without hunting through code:
+
+| Panel | Bands |
+|---|---|
+| New Inquiries (count-up) | 0–5 calm green · 5–15 amber · 15–30 orange · 30+ **red, pulsing** |
+| Appointments (countdown) | >60 min out dim/neutral · ≤60 min blue "prep" · ≤15 min green "arriving" · 10 min late amber · 20 min late **red, "NO SHOW — CALL"** |
+| On the Floor (count-up) | 0–10 neutral · 10–20 amber "check in" · 20+ orange "needs attention" · 40+ **red, pulsing** |
+
+Unconfirmed appointments also carry a persistent dashed outline all day.
+A muted-by-default chime (small corner toggle) sounds when a card crosses into
+red. If the feed goes stale (no successful poll within `BOARD_STALE_SECONDS`), a
+small amber "connection lost" indicator appears in the corner — the screen is
+never blanked and timers keep ticking.
+
+### Dev mode vs. live feed
+
+- **Dev mode (default):** leave `BOARD_FEED_URL` empty. The board runs off a
+  seeded, self-aging mock feed (`app/board_mock.py`) that walks cards through
+  every color state — including an appointment sliding from prep → arriving →
+  late → **no-show** — so you can watch the whole system before connecting n8n.
+- **Live:** set `BOARD_FEED_URL` to your n8n webhook. The board fetches it
+  **server-side** (proxied via `/board/feed`), so the browser never sees the URL
+  and there are no CORS issues. The board holds **no** GoHighLevel credentials —
+  n8n is the only thing that talks to GHL, and it decides which panel each record
+  belongs to from the pipeline stage. The display just renders what it receives.
+
+### Feed shape (what n8n should return)
+
+```json
+{
+  "inquiries": [
+    { "id": "abc123", "name": "Sarah M.", "source": "Web Form",
+      "receivedAt": "2026-08-06T14:22:00Z", "assignedTo": "Jenna",
+      "attempts": 1 }
+  ],
+  "appointments": [
+    { "id": "ghi789", "name": "Chen Family", "appointmentAt": "2026-08-06T18:30:00Z",
+      "interest": "Cavapoo - Pepper", "assignedTo": "Marcus",
+      "confirmed": true, "arrived": false }
+  ],
+  "floor": [
+    { "id": "def456", "party": "Rodriguez", "headcount": 4,
+      "checkedInAt": "2026-08-06T15:01:00Z", "interest": "Goldendoodle - Biscuit",
+      "assignedTo": null }
+  ],
+  "generatedAt": "2026-08-06T15:30:00Z"
+}
+```
+
+`source` is one of Web Form / Facebook / Google / Phone / Walk-in. `assignedTo`
+of `null` renders as **UNASSIGNED** (inquiries) or **NEEDS GREETER** (floor).
+An optional `"stats": { "inquiriesToday": N }` feeds the header's "Inquiries
+Today" counter (falls back to the current inquiry count if omitted). An
+appointment with `"arrived": true` drops off panel 2 (it's on the floor now).
 
 ---
 
@@ -181,7 +265,8 @@ app/
   models.py                # schema: trends, ideas, briefings, performance, series, rules, logs
   seed.py                  # default brand rules, recurring series, inspiration
   schemas.py               # API request bodies
-  main.py                  # FastAPI app (API + dashboard)
+  main.py                  # FastAPI app (API + dashboard + board)
+  board_mock.py            # seeded, self-aging mock feed for the Lead & Floor Board
   scheduler.py             # daily research job (APScheduler)
   ai/
     client.py              # Claude wrapper (web search, JSON, streaming, fallback)
@@ -196,10 +281,13 @@ app/
     analytics.py           # build rows + run the analyst
   routes/
     api.py                 # every API endpoint + all workflow controls
+    board.py               # board page, runtime config, and feed proxy (/board/*)
     serializers.py         # ORM -> JSON
 prompts/                   # 7 editable agent prompts + shared brand context
 static/                    # dashboard (index.html, style.css, app.js)
+                           #   + Lead & Floor Board (board.html, board.css, board.js)
 tests/test_e2e.py          # end-to-end smoke test of the real workflow
+tests/test_board.py        # board feed shape, color coverage, endpoint checks
 data/                      # SQLite lives here (gitignored)
 ```
 

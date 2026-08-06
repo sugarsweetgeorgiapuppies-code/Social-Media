@@ -59,6 +59,25 @@ class Settings:
     # --- Logging ---
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").strip().upper()
 
+    # --- Lead & Floor Board (wall-mounted showroom TV display) ---
+    # The board polls a single JSON feed. An n8n workflow serves this feed;
+    # the board never talks to GoHighLevel directly and holds no credentials.
+    # The URL is proxied server-side (see routes/board.py) so the browser
+    # never sees it and there are no CORS headaches.
+    BOARD_FEED_URL = os.getenv("BOARD_FEED_URL", "").strip()
+    # Dev mode: run entirely off a seeded, self-aging mock feed so you can
+    # watch cards move through every urgency color before wiring up n8n.
+    # Defaults to ON whenever no BOARD_FEED_URL is configured.
+    BOARD_DEV_MODE = _bool("BOARD_DEV_MODE", not BOARD_FEED_URL)
+    # Name shown in the board header.
+    BOARD_STORE_NAME = os.getenv("BOARD_STORE_NAME", BUSINESS_NAME).strip()
+    # How often the browser re-polls the feed (seconds).
+    BOARD_POLL_SECONDS = int(os.getenv("BOARD_POLL_SECONDS", "15"))
+    # No successful poll within this window => show "connection lost".
+    BOARD_STALE_SECONDS = int(os.getenv("BOARD_STALE_SECONDS", "90"))
+    # Seconds to wait on the upstream feed before treating it as failed.
+    BOARD_FEED_TIMEOUT = int(os.getenv("BOARD_FEED_TIMEOUT", "10"))
+
     @property
     def ai_enabled(self) -> bool:
         """True when a real Claude key is configured (live research path)."""

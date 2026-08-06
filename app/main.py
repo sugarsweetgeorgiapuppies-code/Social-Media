@@ -11,6 +11,7 @@ from .config import STATIC_DIR, settings
 from .database import init_db
 from .logging_config import configure_logging, get_logger
 from .routes.api import router as api_router
+from .routes.board import router as board_router
 from .scheduler import shutdown_scheduler, start_scheduler
 
 configure_logging()
@@ -38,6 +39,7 @@ app = FastAPI(
 )
 
 app.include_router(api_router)
+app.include_router(board_router)
 
 
 @app.get("/health")
