@@ -148,8 +148,6 @@ function leadCardHTML(d) {
     </div>
     <div class="card-line2">
       <span class="meta rep"></span>
-      <span class="sep">·</span>
-      <span class="meta attempts"></span>
     </div>`;
 }
 
@@ -180,9 +178,6 @@ function refreshCardFields(entry, d, kind) {
   if (kind === "lead") {
     el.querySelector(".card-name").textContent = d.name ?? "";
     el.querySelector(".badge").textContent = d.source || "—";
-    const n = Number(d.attempts) || 0;
-    el.querySelector(".attempts").textContent =
-      n === 0 ? "No attempts" : `${n} attempt${n === 1 ? "" : "s"}`;
     setAssignee(el, ".rep", d.assignedTo, "UNASSIGNED");
   } else {
     el.querySelector(".card-name").textContent = d.name ?? "";
