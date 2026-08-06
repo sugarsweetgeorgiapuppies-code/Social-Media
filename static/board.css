@@ -159,7 +159,7 @@ html, body {
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 2fr 1fr; /* New Inquiries is the main panel */
   gap: 24px;
   padding: 8px 32px 28px;
 }
@@ -216,7 +216,8 @@ html, body {
   min-height: 0;
   display: grid;
   grid-template-columns: 1fr;
-  grid-template-rows: 1fr; /* overwritten to repeat(N, minmax(0,1fr)) in JS */
+  grid-template-rows: 1fr; /* overwritten to repeat(N, minmax(0, CARD_MAX)) in JS */
+  align-content: start;    /* cards keep a fixed height & pack from the top */
   gap: 14px;
 }
 
@@ -286,7 +287,7 @@ html, body {
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
-.appt-time { font-size: 60px; }
+.appt-time { font-size: 42px; } /* the narrow side column needs a smaller clock */
 
 .card-line2 {
   display: flex;

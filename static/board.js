@@ -34,6 +34,10 @@ const ALL_LEVEL_CLASSES = [
   "lvl-green", "lvl-blue", "lvl-blush", "lvl-orange", "lvl-red", "lvl-neutral",
 ];
 
+/* Max card height (px on the 1920x1080 canvas). Cards keep this size and pack
+   from the top; they only shrink below it when a panel has too many to fit. */
+const CARD_MAX_ROW = 150;
+
 /* Fallbacks — overridden at runtime by /board/config. */
 const CONFIG = {
   pollSeconds: 15, // re-poll the feed
@@ -148,6 +152,8 @@ function leadCardHTML(d) {
     </div>
     <div class="card-line2">
       <span class="meta rep"></span>
+      <span class="sep sep-int" hidden>·</span>
+      <span class="meta interest"></span>
     </div>`;
 }
 
@@ -179,6 +185,11 @@ function refreshCardFields(entry, d, kind) {
     el.querySelector(".card-name").textContent = d.name ?? "";
     el.querySelector(".badge").textContent = d.source || "—";
     setAssignee(el, ".rep", d.assignedTo, "UNASSIGNED");
+    // Show the puppy/breed interest only when the feed provides one.
+    const interest = (d.interest || "").trim();
+    el.querySelector(".interest").textContent = interest;
+    el.querySelector(".interest").style.display = interest ? "" : "none";
+    el.querySelector(".sep-int").hidden = !interest;
   } else {
     el.querySelector(".card-name").textContent = d.name ?? "";
     el.querySelector(".appt-time").textContent = fmtClock(entry.sortMs);
@@ -252,7 +263,8 @@ function layoutRows(panel) {
     panel.root.style.gridTemplateRows = "1fr";
     panel.root.appendChild(emptyState(panel.kind));
   } else {
-    panel.root.style.gridTemplateRows = `repeat(${live.length}, minmax(0, 1fr))`;
+    panel.root.style.gridTemplateRows =
+      `repeat(${live.length}, minmax(0, ${CARD_MAX_ROW}px))`;
   }
 }
 
