@@ -1,5 +1,5 @@
 {
-  "name": "Lead & Appointment Board — Feed (Stage 2: live GoHighLevel inquiries)",
+  "name": "Lead & Appointment Board \u2014 Feed (Stage 3: live inquiries + appointments)",
   "nodes": [
     {
       "parameters": {
@@ -12,7 +12,10 @@
       "name": "Board polls this (GET)",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [140, 300],
+      "position": [
+        80,
+        300
+      ],
       "webhookId": "board-feed"
     },
     {
@@ -24,8 +27,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Version", "value": "2021-07-28" },
-            { "name": "Accept", "value": "application/json" }
+            {
+              "name": "Version",
+              "value": "2021-07-28"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
           ]
         },
         "options": {}
@@ -34,7 +43,10 @@
       "name": "Get pipelines",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [360, 300]
+      "position": [
+        300,
+        300
+      ]
     },
     {
       "parameters": {
@@ -45,8 +57,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Version", "value": "2021-07-28" },
-            { "name": "Accept", "value": "application/json" }
+            {
+              "name": "Version",
+              "value": "2021-07-28"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
           ]
         },
         "options": {}
@@ -55,7 +73,10 @@
       "name": "Get opportunities",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [580, 300]
+      "position": [
+        520,
+        300
+      ]
     },
     {
       "parameters": {
@@ -66,8 +87,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Version", "value": "2021-07-28" },
-            { "name": "Accept", "value": "application/json" }
+            {
+              "name": "Version",
+              "value": "2021-07-28"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
           ]
         },
         "options": {}
@@ -76,17 +103,53 @@
       "name": "Get users",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [800, 300]
+      "position": [
+        740,
+        300
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// Assemble the board feed from live GoHighLevel data.\n// New Inquiries = opportunities in the General Inquiry pipeline that are NOT\n// yet in the \"Appointment Booked\" stage. Appointments are wired up in the\n// next step (they need the calendar), so we return an empty list for now.\n\nconst pipesResp = $('Get pipelines').first().json;\nconst pipelines = pipesResp.pipelines || [];\nconst gi = pipelines.find(p => (p.name || '').toLowerCase().includes('general inquiry')) || pipelines[0] || { stages: [] };\nconst stageName = {};\n(gi.stages || []).forEach(s => { stageName[s.id] = (s.name || '').toLowerCase(); });\n\nconst usersResp = $('Get users').first().json;\nconst users = usersResp.users || [];\nconst nameByUser = {};\nusers.forEach(u => {\n  const n = (u.name || [u.firstName, u.lastName].filter(Boolean).join(' ')).trim();\n  if (n) nameByUser[u.id] = n;\n});\n\nconst oppResp = $('Get opportunities').first().json;\nlet opps = oppResp.opportunities || [];\nopps = opps.filter(o => o.pipelineId === gi.id);\n\nconst shortName = (full) => {\n  const parts = String(full || '').trim().split(/\\s+/).filter(Boolean);\n  if (parts.length === 0) return 'Lead';\n  if (parts.length === 1) return parts[0];\n  return `${parts[0]} ${parts[parts.length - 1][0]}.`;\n};\n\nconst inquiries = [];\nfor (const o of opps) {\n  const stage = stageName[o.pipelineStageId] || '';\n  if (stage.includes('appointment')) continue; // booked -> leaves the inquiries panel\n  inquiries.push({\n    id: o.id,\n    name: shortName(o.contact && o.contact.name ? o.contact.name : o.name),\n    source: o.source || '\\u2014',\n    receivedAt: o.createdAt,\n    assignedTo: o.assignedTo ? (nameByUser[o.assignedTo] || 'Assigned') : null,\n    attempts: 0\n  });\n}\n\nreturn [{ json: {\n  inquiries,\n  appointments: [],\n  floor: [],\n  generatedAt: new Date().toISOString(),\n  stats: { inquiriesToday: inquiries.length }\n} }];"
+        "method": "GET",
+        "url": "=https://services.leadconnectorhq.com/calendars/events?locationId=7OAoy2QT49JimX9IsVnf&calendarId=g8MCjvLjpPvyvu4k3WGG&startTime={{ $now.minus({ hours: 6 }).toMillis() }}&endTime={{ $now.plus({ hours: 42 }).toMillis() }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Version",
+              "value": "2021-07-28"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-appointments",
+      "name": "Get appointments",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build the board feed from live GoHighLevel data.\nconst pipesResp = $('Get pipelines').first().json;\nconst pipelines = pipesResp.pipelines || [];\nconst gi = pipelines.find(p => (p.name || '').toLowerCase().includes('general inquiry')) || pipelines[0] || { stages: [] };\nconst stageName = {};\n(gi.stages || []).forEach(s => { stageName[s.id] = (s.name || '').toLowerCase(); });\n\nconst usersResp = $('Get users').first().json;\nconst users = usersResp.users || [];\nconst nameByUser = {};\nusers.forEach(u => {\n  const n = (u.name || [u.firstName, u.lastName].filter(Boolean).join(' ')).trim();\n  if (n) nameByUser[u.id] = n;\n});\n\nconst shortName = (full) => {\n  const parts = String(full || '').trim().split(/\\s+/).filter(Boolean);\n  if (parts.length === 0) return 'Lead';\n  if (parts.length === 1) return parts[0];\n  return parts[0] + ' ' + parts[parts.length - 1][0] + '.';\n};\n\n// --- New Inquiries: General Inquiry pipeline, excluding Appointment Booked ---\nconst oppResp = $('Get opportunities').first().json;\nconst opps = (oppResp.opportunities || []).filter(o => o.pipelineId === gi.id);\nconst inquiries = [];\nfor (const o of opps) {\n  const stage = stageName[o.pipelineStageId] || '';\n  if (stage.includes('appointment')) continue; // booked -> not an inquiry\n  inquiries.push({\n    id: o.id,\n    name: shortName(o.contact && o.contact.name ? o.contact.name : o.name),\n    source: o.source || '\u2014',\n    receivedAt: o.createdAt,\n    assignedTo: o.assignedTo ? (nameByUser[o.assignedTo] || 'Assigned') : null,\n    attempts: 0\n  });\n}\n\n// --- Appointments: calendar events (today + tomorrow window) ---\nconst evResp = $('Get appointments').first().json;\nconst events = evResp.events || [];\nconst skip = new Set(['cancelled', 'invalid']);\nconst appointments = [];\nfor (const e of events) {\n  const st = (e.appointmentStatus || '').toLowerCase();\n  if (skip.has(st)) continue;\n  appointments.push({\n    id: e.id,\n    name: shortName(e.contactName || (e.contact && e.contact.name) || e.title),\n    appointmentAt: e.startTime,\n    interest: '',\n    assignedTo: e.assignedUserId ? (nameByUser[e.assignedUserId] || 'Assigned') : null,\n    confirmed: st === 'confirmed',\n    arrived: st === 'showed'\n  });\n}\n\nreturn [{ json: {\n  inquiries,\n  appointments,\n  floor: [],\n  generatedAt: new Date().toISOString(),\n  stats: { inquiriesToday: inquiries.length }\n} }];"
       },
       "id": "build-feed",
       "name": "Build feed JSON",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1020, 300]
+      "position": [
+        1180,
+        300
+      ]
     },
     {
       "parameters": {
@@ -98,15 +161,79 @@
       "name": "Return to board",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [1240, 300]
+      "position": [
+        1400,
+        300
+      ]
     }
   ],
   "connections": {
-    "Board polls this (GET)": { "main": [[{ "node": "Get pipelines", "type": "main", "index": 0 }]] },
-    "Get pipelines": { "main": [[{ "node": "Get opportunities", "type": "main", "index": 0 }]] },
-    "Get opportunities": { "main": [[{ "node": "Get users", "type": "main", "index": 0 }]] },
-    "Get users": { "main": [[{ "node": "Build feed JSON", "type": "main", "index": 0 }]] },
-    "Build feed JSON": { "main": [[{ "node": "Return to board", "type": "main", "index": 0 }]] }
+    "Board polls this (GET)": {
+      "main": [
+        [
+          {
+            "node": "Get pipelines",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get pipelines": {
+      "main": [
+        [
+          {
+            "node": "Get opportunities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get opportunities": {
+      "main": [
+        [
+          {
+            "node": "Get users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get users": {
+      "main": [
+        [
+          {
+            "node": "Get appointments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get appointments": {
+      "main": [
+        [
+          {
+            "node": "Build feed JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build feed JSON": {
+      "main": [
+        [
+          {
+            "node": "Return to board",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
   "settings": {},
   "active": false
