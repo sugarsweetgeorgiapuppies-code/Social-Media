@@ -19,6 +19,7 @@ import urllib.request
 from fastapi import APIRouter
 from fastapi.responses import FileResponse, JSONResponse
 
+from .. import board_ghl
 from ..board_mock import generate_mock_feed
 from ..config import STATIC_DIR, settings
 from ..logging_config import get_logger
@@ -42,7 +43,7 @@ def board_config():
         "storeName": settings.BOARD_STORE_NAME,
         "pollSeconds": settings.BOARD_POLL_SECONDS,
         "staleSeconds": settings.BOARD_STALE_SECONDS,
-        "devMode": settings.BOARD_DEV_MODE,
+        "devMode": settings.BOARD_DEV_MODE and not settings.board_ghl_enabled,
     }
 
 
@@ -55,7 +56,17 @@ def board_feed():
     failure we return HTTP 502 with a small error body — the frontend treats
     that as a failed poll (and, after ``BOARD_STALE_SECONDS``, shows the
     "connection lost" indicator) rather than blanking the screen.
+
+    Priority: direct GoHighLevel (no n8n) > dev/mock > proxied BOARD_FEED_URL.
     """
+    # Direct GoHighLevel: this server fetches GHL itself, so n8n runs nothing.
+    if settings.board_ghl_enabled:
+        try:
+            return board_ghl.build_feed()
+        except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
+            log.warning("Board GHL feed failed: %s", exc)
+            return JSONResponse(status_code=502, content={"error": "GoHighLevel unavailable"})
+
     if settings.BOARD_DEV_MODE:
         return generate_mock_feed()
 

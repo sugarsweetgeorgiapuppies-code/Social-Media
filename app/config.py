@@ -72,11 +72,25 @@ class Settings:
     # Name shown in the board header.
     BOARD_STORE_NAME = os.getenv("BOARD_STORE_NAME", BUSINESS_NAME).strip()
     # How often the browser re-polls the feed (seconds).
-    BOARD_POLL_SECONDS = int(os.getenv("BOARD_POLL_SECONDS", "15"))
+    BOARD_POLL_SECONDS = int(os.getenv("BOARD_POLL_SECONDS", "60"))
     # No successful poll within this window => show "connection lost".
-    BOARD_STALE_SECONDS = int(os.getenv("BOARD_STALE_SECONDS", "90"))
+    BOARD_STALE_SECONDS = int(os.getenv("BOARD_STALE_SECONDS", "180"))
     # Seconds to wait on the upstream feed before treating it as failed.
     BOARD_FEED_TIMEOUT = int(os.getenv("BOARD_FEED_TIMEOUT", "10"))
+
+    # --- Direct GoHighLevel mode (no n8n; the board's backend calls GHL) ---
+    # Set these to have this server fetch GoHighLevel directly, so n8n runs zero
+    # executions. The token stays server-side; the browser never sees it.
+    BOARD_GHL_TOKEN = os.getenv("BOARD_GHL_TOKEN", "").strip()
+    BOARD_GHL_LOCATION_ID = os.getenv("BOARD_GHL_LOCATION_ID", "").strip()
+    BOARD_GHL_CALENDAR_ID = os.getenv("BOARD_GHL_CALENDAR_ID", "").strip()
+    BOARD_GHL_PIPELINE = os.getenv("BOARD_GHL_PIPELINE", "General Inquiry").strip()
+    # Cache the GHL result this many seconds (rapid polls reuse it).
+    BOARD_GHL_CACHE_SECONDS = int(os.getenv("BOARD_GHL_CACHE_SECONDS", "30"))
+
+    @property
+    def board_ghl_enabled(self) -> bool:
+        return bool(self.BOARD_GHL_TOKEN and self.BOARD_GHL_LOCATION_ID)
 
     @property
     def ai_enabled(self) -> bool:

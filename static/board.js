@@ -44,12 +44,27 @@ const CARD_ROW_PX = 116;
 
 /* Fallbacks — overridden at runtime by /board/config. */
 const CONFIG = {
-  pollSeconds: 15, // re-poll the feed
+  pollSeconds: 60, // re-poll the feed (also set via BOARD_POLL_SECONDS)
   staleSeconds: 90, // no successful poll within this => "connection lost"
   feedUrl: "/board/feed",
   configUrl: "/board/config",
   storeName: "Lead & Appointment Board",
 };
+
+/* Reset the inquiry "waiting" clock to 0 at store-open each day, so leads that
+   arrived after hours (handled by the AI overnight) don't show a huge wait when
+   the team walks in. Every lead in the panel counts from the later of its
+   received time and today's open time. Set RESET_AT_OPEN = false to count from
+   the true received time instead. Hours are local; tune freely (0 = Sunday). */
+const RESET_AT_OPEN = true;
+const OPEN_HOUR_BY_DAY = { 0: 13, 1: 11, 2: 11, 3: 11, 4: 11, 5: 11, 6: 11 };
+
+/** Today's store-open time (ms), by local weekday. */
+function openTimeMs() {
+  const d = new Date();
+  const hour = OPEN_HOUR_BY_DAY[d.getDay()] ?? 11;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), hour, 0, 0, 0).getTime();
+}
 
 /* --------------------------------------------------------------- utilities */
 
@@ -169,9 +184,9 @@ function apptCardHTML(d, appointmentMs) {
     </div>
     <div class="card-line2">
       <span class="meta countdown"></span>
-      <span class="sep">·</span>
-      <span class="meta interest">${esc(d.interest || "—")}</span>
-      <span class="sep">·</span>
+      <span class="sep sep-int" hidden>·</span>
+      <span class="meta interest"></span>
+      <span class="sep sep-assoc" hidden>·</span>
       <span class="meta assoc"></span>
     </div>`;
 }
@@ -197,8 +212,15 @@ function refreshCardFields(entry, d, kind) {
   } else {
     el.querySelector(".card-name").textContent = d.name ?? "";
     el.querySelector(".appt-time").textContent = fmtClock(entry.sortMs);
-    el.querySelector(".interest").textContent = d.interest || "—";
-    setAssignee(el, ".assoc", d.assignedTo, "NO ASSOCIATE");
+    // Show interest and associate only when present — no "—", no "NO ASSOCIATE".
+    const interest = (d.interest || "").trim();
+    el.querySelector(".interest").textContent = interest;
+    el.querySelector(".interest").style.display = interest ? "" : "none";
+    el.querySelector(".sep-int").hidden = !interest;
+    const assoc = (d.assignedTo || "").trim();
+    el.querySelector(".assoc").textContent = assoc;
+    el.querySelector(".assoc").style.display = assoc ? "" : "none";
+    el.querySelector(".sep-assoc").hidden = !assoc;
     el.classList.toggle("unconfirmed", !d.confirmed);
   }
 }
@@ -255,7 +277,18 @@ function reorder(panel) {
     const rank = (e) => appointmentLevel((e.sortMs - t) / 1000).rank;
     entries.sort((a, b) => rank(a) - rank(b) || a.sortMs - b.sortMs);
   }
-  entries.forEach((e) => panel.root.appendChild(e.el));
+  // Only touch the DOM when the order actually changed — re-appending every
+  // tick is what caused the flicker.
+  const current = [...panel.root.querySelectorAll(".card:not(.leaving)")];
+  const desired = entries.map((e) => e.el);
+  let same = current.length === desired.length;
+  for (let i = 0; same && i < desired.length; i++) {
+    if (current[i] !== desired[i]) same = false;
+  }
+  if (same) return;
+  desired.forEach((e) => panel.root.appendChild(e));
+  const chip = panel.root.querySelector(".overflow-chip");
+  if (chip) panel.root.appendChild(chip); // keep the "+N" chip last
 }
 
 /** Rows = card count, so cards share the panel height evenly (never overflow). */
@@ -314,7 +347,10 @@ function updatePanelTimers(panel) {
       }
       applyLevel(entry, appointmentLevel(remaining).level);
     } else {
-      const ageSec = (t - entry.sortMs) / 1000;
+      // Count from the later of received time and today's store-open time,
+      // so overnight/after-hours leads reset to 0 when the day starts.
+      const startMs = RESET_AT_OPEN ? Math.max(entry.sortMs, openTimeMs()) : entry.sortMs;
+      const ageSec = Math.max(0, (t - startMs) / 1000);
       entry.el.querySelector(".card-timer").textContent = fmtTimer(ageSec);
       applyLevel(entry, levelFor(ageSec, panel.levels));
     }
