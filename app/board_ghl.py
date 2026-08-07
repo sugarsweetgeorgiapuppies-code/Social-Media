@@ -97,7 +97,14 @@ def build_feed() -> dict:
         log.warning("GHL users fetch failed: %s", exc)
 
     # --- New Inquiries (General Inquiry pipeline, not Appointment Booked) ----
-    opp_resp = _get("/opportunities/search", {"location_id": loc, "limit": 100})
+    # status=all so leads already handled today (won/lost/booked) still count
+    # toward the daily total, which should only ever climb. Fall back if the
+    # API doesn't accept the param.
+    try:
+        opp_resp = _get("/opportunities/search",
+                        {"location_id": loc, "limit": 100, "status": "all"})
+    except Exception:
+        opp_resp = _get("/opportunities/search", {"location_id": loc, "limit": 100})
     try:
         tz = ZoneInfo(settings.TIMEZONE)
     except Exception:
@@ -105,14 +112,17 @@ def build_feed() -> dict:
     today = dt.datetime.now(tz).date()
 
     inquiries = []
-    inquiries_today = 0  # everyone who came in today, even if already handled
+    inquiries_today = 0  # everyone who came in today, regardless of outcome
     for o in opp_resp.get("opportunities", []):
         if o.get("pipelineId") != gi.get("id"):
             continue
         created = _parse_dt(o.get("createdAt"))
         if created and created.astimezone(tz).date() == today:
             inquiries_today += 1
+        # The board only lists leads still awaiting a call: open, pre-appointment.
         if "appointment" in stage_name.get(o.get("pipelineStageId"), ""):
+            continue
+        if (o.get("status") or "open") != "open":
             continue
         contact = o.get("contact") or {}
         assigned = o.get("assignedTo")
