@@ -106,7 +106,7 @@ def test_endpoints():
 
     r = client.get("/board/")
     assert r.status_code == 200
-    assert "Lead" in r.text  # the board page
+    assert "New Inquiries" in r.text  # the board page
 
 
 if __name__ == "__main__":
