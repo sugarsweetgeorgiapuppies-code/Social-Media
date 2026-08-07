@@ -209,6 +209,17 @@ const Dog = {
   x: 150, y: 992, tx: 150, ty: 992, facing: 1,
   speed: 1100, busy: false, queue: [], arrive: null, lastT: 0, nextRoam: 0,
 
+  // Idle tricks the pup performs at random. Each is a CSS class + duration.
+  TRICKS: [
+    { cls: "t-hop", ms: 620 },      // happy hop
+    { cls: "t-flip", ms: 820 },     // backflip
+    { cls: "t-roll", ms: 900 },     // roll over
+    { cls: "t-shake", ms: 720 },    // shake it off
+    { cls: "t-stretch", ms: 1000 }, // play-bow stretch
+    { cls: "t-sniff", ms: 1200 },   // sniff the ground
+    { cls: "bark", ms: 820, bark: true }, // "Woof!" bubble
+  ],
+
   init() {
     try {
       if (matchMedia("(prefers-reduced-motion: reduce)").matches) { this.enabled = false; return; }
@@ -243,13 +254,18 @@ const Dog = {
     const dx = this.tx - this.x, dy = this.ty - this.y;
     const dist = Math.hypot(dx, dy);
 
-    if (dist <= 2 && !this.arrive) {
-      if (!this.busy && this.queue.length) {
+    if (dist <= 2 && !this.arrive && !this.busy) {
+      if (this.queue.length) {
         this.beginKick(this.queue.shift());
-      } else if (!this.busy && t > this.nextRoam) {
-        this.tx = 140 + Math.random() * 1600;
-        this.ty = 968 + Math.random() * 22;
-        this.nextRoam = t + 14000 + Math.random() * 14000;
+      } else if (t > this.nextRoam) {
+        // When settled, either wander to a fresh clear spot or do a trick.
+        if (Math.random() < 0.5) {
+          this.doTrick();
+        } else {
+          const sp = this.safeSpot();
+          this.tx = sp.x; this.ty = sp.y;
+        }
+        this.nextRoam = t + 4500 + Math.random() * 7000;
       }
     }
 
@@ -297,6 +313,86 @@ const Dog = {
         this.nextRoam = this.lastT + 4000;
       }, 680);
     };
+  },
+
+  /** Convert an element's rect into stage-space coordinates. */
+  _toStage(rect, sr, s) {
+    return {
+      x: (rect.left - sr.left) / s, y: (rect.top - sr.top) / s,
+      w: rect.width / s, h: rect.height / s,
+      right: (rect.right - sr.left) / s, bottom: (rect.bottom - sr.top) / s,
+    };
+  },
+
+  /** A resting spot in the empty area BELOW the cards — never on top of one. */
+  safeSpot() {
+    const stage = document.getElementById("stage");
+    const s = parseFloat(getComputedStyle(stage).getPropertyValue("--scale")) || 1;
+    const sr = stage.getBoundingClientRect();
+    const spots = [];
+    for (const sel of [".panel-leads", ".panel-appts"]) {
+      const pl = document.querySelector(sel);
+      if (!pl) continue;
+      const pr = this._toStage(pl.getBoundingClientRect(), sr, s);
+      const cards = [...pl.querySelectorAll(".cards .card:not(.leaving):not(.kicked)")];
+      let topFree = pr.y + 96; // below the panel title
+      if (cards.length) {
+        topFree = this._toStage(cards[cards.length - 1].getBoundingClientRect(), sr, s).bottom + 22;
+      }
+      const bottomLimit = pr.bottom - 66;
+      if (bottomLimit - topFree > 60) {
+        spots.push({
+          x: pr.x + 44 + Math.random() * Math.max(40, pr.w - 170),
+          y: topFree + Math.random() * (bottomLimit - topFree - 8),
+          room: bottomLimit - topFree,
+        });
+      }
+    }
+    if (spots.length) return spots[Math.floor(Math.random() * spots.length)];
+    return { x: 150 + Math.random() * 1500, y: 1024 }; // both panels full: bottom strip
+  },
+
+  /** If the pup is sitting on top of a card, scamper to a clear spot. */
+  avoid() {
+    if (!this.enabled || this.busy) return;
+    const stage = document.getElementById("stage");
+    const s = parseFloat(getComputedStyle(stage).getPropertyValue("--scale")) || 1;
+    const sr = stage.getBoundingClientRect();
+    const d = { left: this.x, top: this.y, right: this.x + 76, bottom: this.y + 54 };
+    for (const c of document.querySelectorAll(".cards .card:not(.leaving):not(.kicked)")) {
+      const r = this._toStage(c.getBoundingClientRect(), sr, s);
+      if (d.left < r.right && d.right < r.right + r.w && d.right > r.x &&
+          d.top < r.bottom && d.bottom > r.y) {
+        const sp = this.safeSpot();
+        this.tx = sp.x; this.ty = sp.y;
+        this.nextRoam = this.lastT + 3000;
+        return;
+      }
+    }
+  },
+
+  /** Perform a random trick in place. */
+  doTrick() {
+    const tr = this.TRICKS[Math.floor(Math.random() * this.TRICKS.length)];
+    this.busy = true;
+    this.emo.classList.add(tr.cls);
+    if (tr.bark) this.bark();
+    setTimeout(() => {
+      this.emo.classList.remove(tr.cls);
+      this.busy = false;
+      this.nextRoam = this.lastT + 3500 + Math.random() * 6000;
+    }, tr.ms);
+  },
+
+  /** A little "Woof!" speech bubble above the pup (no sound). */
+  bark() {
+    const bub = document.createElement("div");
+    bub.className = "woof";
+    bub.textContent = "Woof!";
+    bub.style.left = (this.x + 40) + "px";
+    bub.style.top = (this.y - 22) + "px";
+    document.getElementById("stage").appendChild(bub);
+    setTimeout(() => bub.remove(), 900);
   },
 };
 
@@ -410,6 +506,7 @@ function syncPanel(panel, list) {
   updatePanelTimers(panel); // paint colors/text before we sort by color
   reorder(panel);
   layoutRows(panel);
+  Dog.avoid(); // if a new card landed on the pup, it scampers clear
 }
 
 /** Sort by urgency color, not time alone.

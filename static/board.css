@@ -428,6 +428,13 @@ html, body {
   filter: drop-shadow(0 7px 5px rgba(43, 48, 43, 0.2));
 }
 .dogsvg { display: block; }
+/* Ambient idle motion: a gentle breathing so the pup is never a frozen statue.
+   (running / trick / kick classes override this while they play.) */
+.dog-emo { animation: breathe 2.6s ease-in-out infinite; }
+@keyframes breathe {
+  0%, 100% { transform: translateY(0) scaleY(1); }
+  50% { transform: translateY(-1.5px) scaleY(1.03); }
+}
 /* subtle body bob while trotting; a lean during the kick */
 .dog-emo.running { animation: trot 0.26s linear infinite; }
 @keyframes trot { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
@@ -459,6 +466,63 @@ html, body {
 /* The punt: a back leg swings hard forward. */
 .dog-emo.kicking .leg-bn { animation: kickleg 0.36s ease; }
 @keyframes kickleg { 0% { transform: rotate(-25deg); } 45% { transform: rotate(70deg); } 100% { transform: rotate(-20deg); } }
+
+/* --- random idle tricks -------------------------------------------------- */
+.dog-emo.t-hop { animation: t-hop 0.62s ease; }
+@keyframes t-hop { 0%, 100% { transform: translateY(0); } 45% { transform: translateY(-42px); } }
+.dog-emo.t-flip { animation: t-flip 0.82s ease; }
+@keyframes t-flip {
+  0% { transform: translateY(0) rotate(0); }
+  45% { transform: translateY(-58px) rotate(-200deg); }
+  100% { transform: translateY(0) rotate(-360deg); }
+}
+.dog-emo.t-roll { animation: t-roll 0.9s ease-in-out; }
+@keyframes t-roll { 0% { transform: rotate(0); } 100% { transform: rotate(360deg); } }
+.dog-emo.t-shake { animation: t-shake 0.72s ease; }
+@keyframes t-shake {
+  0%, 100% { transform: rotate(0); }
+  15% { transform: rotate(-11deg); } 30% { transform: rotate(10deg); }
+  45% { transform: rotate(-8deg); } 60% { transform: rotate(6deg); }
+  75% { transform: rotate(-4deg); }
+}
+.dog-emo.t-stretch { animation: t-stretch 1s ease; }
+@keyframes t-stretch { 0%, 100% { transform: scale(1); } 45% { transform: scale(1.12, 0.82) translateY(6px); } }
+.dog-emo.t-sniff { animation: t-sniff 1.2s ease; }
+@keyframes t-sniff {
+  0%, 100% { transform: rotate(0) translateY(0); }
+  30%, 70% { transform: rotate(9deg) translateY(6px); }
+  50% { transform: rotate(7deg) translateY(9px); }
+}
+.dog-emo.bark { animation: t-bark 0.82s ease; }
+@keyframes t-bark {
+  0%, 100% { transform: rotate(0); }
+  20% { transform: rotate(-9deg) translateY(-6px); }
+  45% { transform: rotate(2deg); }
+  65% { transform: rotate(-6deg) translateY(-4px); }
+}
+
+/* "Woof!" speech bubble. */
+.woof {
+  position: absolute; z-index: 29; pointer-events: none;
+  font-family: var(--font-body); font-weight: 800; font-size: 23px;
+  color: var(--sage-deep);
+  background: #fff; border: 1.5px solid var(--line);
+  padding: 5px 14px; border-radius: 15px;
+  box-shadow: var(--shadow-sm);
+  animation: woofpop 0.9s ease forwards;
+}
+.woof::after {
+  content: ""; position: absolute; left: 16px; bottom: -7px;
+  width: 12px; height: 12px; background: #fff;
+  border-right: 1.5px solid var(--line); border-bottom: 1.5px solid var(--line);
+  transform: rotate(45deg);
+}
+@keyframes woofpop {
+  0% { opacity: 0; transform: translateY(6px) scale(0.8); }
+  20% { opacity: 1; transform: none; }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-10px); }
+}
 
 /* Card being punted off the board by the pup. */
 .card.awaiting-kick { pointer-events: none; }
