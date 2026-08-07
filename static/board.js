@@ -188,45 +188,70 @@ const Chime = {
    when an inquiry is handled, dashes over and punts the card off the screen.
    Disabled automatically when the viewer prefers reduced motion. */
 const DOG_SVG = `
-<svg class="dogsvg" viewBox="0 0 152 116" width="82" height="63" xmlns="http://www.w3.org/2000/svg">
+<svg class="dogsvg" viewBox="0 0 158 120" width="124" height="94" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="dgBody" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#e3aa6b"/><stop offset="1" stop-color="#bc7d45"/>
+      <stop offset="0" stop-color="#f2dab0"/><stop offset="1" stop-color="#d6b284"/>
     </linearGradient>
     <linearGradient id="dgLeg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#c68a52"/><stop offset="1" stop-color="#9d6836"/>
+      <stop offset="0" stop-color="#e6c495"/><stop offset="1" stop-color="#bd9463"/>
     </linearGradient>
-    <radialGradient id="dgHead" cx="0.62" cy="0.38" r="0.85">
-      <stop offset="0" stop-color="#e7ae6d"/><stop offset="1" stop-color="#bd7f42"/>
+    <radialGradient id="dgHead" cx="0.58" cy="0.4" r="0.9">
+      <stop offset="0" stop-color="#f4deb6"/><stop offset="1" stop-color="#d6b284"/>
     </radialGradient>
   </defs>
-  <path class="tail" d="M28 58 Q10 52 7 28 Q22 46 36 50 Z" fill="#a2662f"/>
-  <rect class="leg leg-bf" x="42" y="64" width="11" height="32" rx="5.5" fill="#9d6836"/>
-  <rect class="leg leg-ff" x="86" y="64" width="11" height="32" rx="5.5" fill="#9d6836"/>
-  <ellipse cx="64" cy="58" rx="44" ry="25" fill="url(#dgBody)"/>
-  <ellipse cx="70" cy="68" rx="34" ry="14" fill="#ecc593" opacity="0.85"/>
-  <path d="M100 68 q6 10 14 7 q-2 8 -11 6 q-8 -1 -8 -8 z" fill="#e7ae6d"/>
-  <rect class="leg leg-bn" x="50" y="66" width="12" height="33" rx="6" fill="url(#dgLeg)"/>
-  <rect class="leg leg-fn" x="92" y="66" width="12" height="33" rx="6" fill="url(#dgLeg)"/>
-  <path d="M88 34 Q86 52 92 64" stroke="#c25049" stroke-width="9" fill="none" stroke-linecap="round"/>
-  <circle cx="106" cy="48" r="23" fill="url(#dgHead)"/>
-  <path class="ear" d="M96 30 Q80 28 77 52 Q77 66 89 64 Q95 50 100 36 Z" fill="#9d6836"/>
-  <path class="ear" d="M94 34 Q84 36 83 52 Q85 60 90 54 Q92 44 96 38 Z" fill="#7c4d24" opacity="0.6"/>
-  <ellipse cx="128" cy="55" rx="15" ry="12" fill="#efd3a8"/>
-  <path d="M121 60 Q129 66 138 59" stroke="#6b4a2e" stroke-width="1.7" fill="none" stroke-linecap="round"/>
-  <ellipse cx="141" cy="51" rx="4.6" ry="3.9" fill="#2f231d"/>
-  <circle cx="139.4" cy="49.5" r="1.3" fill="#7a6355"/>
-  <path d="M106 36 Q111 33.5 116 36" stroke="#a2662f" stroke-width="2" fill="none" stroke-linecap="round"/>
-  <ellipse cx="112" cy="45" rx="3.4" ry="4.1" fill="#241c18"/>
-  <circle cx="113.3" cy="43.4" r="1.3" fill="#ffffff"/>
-  <circle cx="90" cy="63" r="5.2" fill="#ecc24a" stroke="#c39a22" stroke-width="1.4"/>
+  <!-- tail with a fluffy pom -->
+  <g class="tail">
+    <path d="M30 58 Q20 52 18 42" stroke="#cba774" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <circle cx="15" cy="34" r="11" fill="#eed9b2"/><circle cx="9" cy="40" r="7" fill="#eed9b2"/>
+    <circle cx="22" cy="40" r="7" fill="#eed9b2"/><circle cx="14" cy="46" r="6" fill="#eed9b2"/>
+  </g>
+  <!-- far legs with pom feet -->
+  <path class="leg leg-bf" d="M45 66 L51 66 L51 83 A8 8 0 1 1 45 83 Z" fill="#c39c6a"/>
+  <path class="leg leg-ff" d="M88 66 L94 66 L94 83 A8 8 0 1 1 88 83 Z" fill="#c39c6a"/>
+  <!-- fluffy body -->
+  <ellipse cx="64" cy="58" rx="40" ry="21" fill="url(#dgBody)"/>
+  <g fill="#eed9b2">
+    <circle cx="34" cy="50" r="12"/><circle cx="48" cy="40" r="13"/><circle cx="66" cy="37" r="14"/>
+    <circle cx="84" cy="42" r="12"/><circle cx="95" cy="52" r="11"/>
+    <circle cx="40" cy="66" r="11"/><circle cx="58" cy="70" r="12"/><circle cx="78" cy="66" r="11"/>
+  </g>
+  <ellipse cx="64" cy="56" rx="30" ry="13" fill="url(#dgBody)"/>
+  <!-- near legs with pom feet -->
+  <path class="leg leg-bn" d="M53 68 L60 68 L60 85 A9 9 0 1 1 53 85 Z" fill="url(#dgLeg)"/>
+  <path class="leg leg-fn" d="M96 68 L103 68 L103 85 A9 9 0 1 1 96 85 Z" fill="url(#dgLeg)"/>
+  <!-- collar -->
+  <path d="M92 36 Q90 52 97 64" stroke="#d98fb0" stroke-width="8" fill="none" stroke-linecap="round"/>
+  <!-- fluffy topknot head -->
+  <circle cx="110" cy="48" r="19" fill="url(#dgHead)"/>
+  <g fill="#eed9b2">
+    <circle cx="96" cy="40" r="10"/><circle cx="104" cy="31" r="11"/><circle cx="117" cy="31" r="11"/>
+    <circle cx="126" cy="42" r="10"/><circle cx="123" cy="55" r="9"/><circle cx="108" cy="34" r="10"/>
+  </g>
+  <circle cx="110" cy="48" r="14" fill="url(#dgHead)"/>
+  <!-- floppy fluffy ear -->
+  <g class="ear">
+    <circle cx="93" cy="46" r="9" fill="#d8b57f"/><circle cx="89" cy="58" r="8" fill="#d8b57f"/>
+    <circle cx="92" cy="68" r="7" fill="#d8b57f"/>
+  </g>
+  <!-- slim shaved muzzle -->
+  <ellipse cx="132" cy="56" rx="14" ry="10" fill="#e4c491"/>
+  <path d="M125 61 Q133 67 142 60" stroke="#6b4a2e" stroke-width="1.7" fill="none" stroke-linecap="round"/>
+  <ellipse cx="145" cy="52" rx="4.6" ry="3.9" fill="#2f231d"/>
+  <circle cx="143.4" cy="50.5" r="1.3" fill="#7a6355"/>
+  <path d="M110 38 Q115 35.5 120 38" stroke="#c9a06a" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <ellipse cx="116" cy="47" rx="3.4" ry="4.1" fill="#241c18"/>
+  <circle cx="117.3" cy="45.4" r="1.3" fill="#ffffff"/>
+  <!-- collar tag -->
+  <circle cx="94" cy="64" r="5" fill="#ecc24a" stroke="#c39a22" stroke-width="1.3"/>
 </svg>`;
 
 const Dog = {
   enabled: true,
   el: null, face: null, emo: null,
-  x: 150, y: 992, tx: 150, ty: 992, facing: 1,
-  speed: 1100, busy: false, queue: [], arrive: null, lastT: 0, nextRoam: 0,
+  W: 124, H: 94, // on-canvas footprint (matches the SVG size)
+  x: 150, y: 950, tx: 150, ty: 950, facing: 1,
+  speed: 1200, busy: false, queue: [], arrive: null, lastT: 0, nextRoam: 0,
 
   // Idle tricks the pup performs at random. Each is a CSS class + duration.
   TRICKS: [
@@ -311,8 +336,8 @@ const Dog = {
     const cx = (cr.left - sr.left) / s;
     const cy = (cr.top - sr.top) / s;
     const ch = cr.height / s;
-    this.tx = cx - 56;
-    this.ty = cy + ch - 54;
+    this.tx = cx - this.W * 0.8;
+    this.ty = cy + ch - this.H * 0.86;
     this.arrive = () => {
       this.emo.classList.add("kicking");
       job.cardEl.classList.add("kicked");
@@ -358,17 +383,17 @@ const Dog = {
       if (cards.length) {
         topFree = this._toStage(cards[cards.length - 1].getBoundingClientRect(), sr, s).bottom + 22;
       }
-      const bottomLimit = pr.bottom - 66;
-      if (bottomLimit - topFree > 60) {
+      const bottomLimit = pr.bottom - (this.H + 6);
+      if (bottomLimit - topFree > 40) {
         spots.push({
-          x: pr.x + 44 + Math.random() * Math.max(40, pr.w - 170),
-          y: topFree + Math.random() * (bottomLimit - topFree - 8),
+          x: pr.x + 40 + Math.random() * Math.max(30, pr.w - (this.W + 50)),
+          y: topFree + Math.random() * (bottomLimit - topFree),
           room: bottomLimit - topFree,
         });
       }
     }
     if (spots.length) return spots[Math.floor(Math.random() * spots.length)];
-    return { x: 150 + Math.random() * 1500, y: 1024 }; // both panels full: bottom strip
+    return { x: 150 + Math.random() * 1400, y: 1080 - this.H - 26 }; // panels full: bottom strip
   },
 
   /** If the pup is sitting on top of a card, scamper to a clear spot. */
@@ -377,7 +402,7 @@ const Dog = {
     const stage = document.getElementById("stage");
     const s = parseFloat(getComputedStyle(stage).getPropertyValue("--scale")) || 1;
     const sr = stage.getBoundingClientRect();
-    const d = { left: this.x, top: this.y, right: this.x + 76, bottom: this.y + 54 };
+    const d = { left: this.x, top: this.y, right: this.x + this.W, bottom: this.y + this.H };
     for (const c of document.querySelectorAll(".cards .card:not(.leaving):not(.kicked)")) {
       const r = this._toStage(c.getBoundingClientRect(), sr, s);
       if (d.left < r.right && d.right < r.right + r.w && d.right > r.x &&
