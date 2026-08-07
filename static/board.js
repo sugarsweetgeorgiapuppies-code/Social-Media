@@ -11,12 +11,14 @@
 
 /* ------------------------------------------------------------------ CONFIG */
 
-/* New Inquiries: count-up thresholds in SECONDS (longer wait = more urgent). */
+/* New Inquiries: count-up thresholds in SECONDS (longer wait = more urgent).
+   Goal is a callback within ~10 min, so the scale is tight: green -> yellow ->
+   orange -> red, hitting red at 20 min. Tune the minutes freely. */
 const INQUIRY_LEVELS = [
-  { level: "green",  maxSeconds:  5 * 60 }, //  0–5  min
-  { level: "blush",  maxSeconds: 15 * 60 }, //  5–15 min
-  { level: "orange", maxSeconds: 30 * 60 }, // 15–30 min
-  { level: "red",    maxSeconds: Infinity }, // 30+  min  (pulses)
+  { level: "green",  maxSeconds:  5 * 60 }, //  0–5   min  (fresh)
+  { level: "yellow", maxSeconds: 10 * 60 }, //  5–10  min  (approaching the 10-min goal)
+  { level: "orange", maxSeconds: 20 * 60 }, // 10–20  min  (past the goal)
+  { level: "red",    maxSeconds: Infinity }, // 20+   min  (too long, pulses)
 ];
 
 /* Appointments: COUNTDOWN thresholds in SECONDS relative to the appt time.
@@ -31,7 +33,7 @@ const APPOINTMENT_THRESHOLDS = {
 };
 
 const ALL_LEVEL_CLASSES = [
-  "lvl-green", "lvl-blue", "lvl-blush", "lvl-orange", "lvl-red", "lvl-neutral",
+  "lvl-green", "lvl-blue", "lvl-yellow", "lvl-orange", "lvl-red", "lvl-neutral",
 ];
 
 /* Fixed card height (px on the 1920x1080 canvas). Cards always render at this

@@ -22,7 +22,7 @@
   /* Card palette: border color / tinted background / readable ink. */
   --green-bd: #4fbf88;   --green-bg: #e6f6ee;   --green-ink: #2e9a63;
   --blue-bd: #29c2e8;    --blue-bg: #ddf3fb;    --blue-ink: #1595b5;
-  --blush-bd: #e0a091;   --blush-bg: #f8ebe7;   --blush-ink: #b9705f;
+  --yellow-bd: #f2c94c;  --yellow-bg: #fdf4d1;  --yellow-ink: #a4790a;
   --orange-bd: #e8873f;  --orange-bg: #fbebdd;  --orange-ink: #c4671f;
   --red-bd: #d65a5a;     --red-bg: #fbe5e5;     --red-ink: #b23b3b;
   --neutral-bd: #cfc5c0; --neutral-bg: #f3eeeb; --neutral-ink: #8a7f79;
@@ -312,6 +312,8 @@ html, body {
 .card.lvl-green   .card-timer { color: var(--green-ink); }
 .card.lvl-blue    { border-color: var(--blue-bd);    background: var(--blue-bg); }
 .card.lvl-blue    .card-timer { color: var(--blue-ink); }
+.card.lvl-yellow  { border-color: var(--yellow-bd);  background: var(--yellow-bg); }
+.card.lvl-yellow  .card-timer { color: var(--yellow-ink); }
 .card.lvl-blush   { border-color: var(--blush-bd);   background: var(--blush-bg); }
 .card.lvl-blush   .card-timer { color: var(--blush-ink); }
 .card.lvl-orange  { border-color: var(--orange-bd);  background: var(--orange-bg); }
