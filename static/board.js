@@ -188,19 +188,38 @@ const Chime = {
    when an inquiry is handled, dashes over and punts the card off the screen.
    Disabled automatically when the viewer prefers reduced motion. */
 const DOG_SVG = `
-<svg class="dogsvg" viewBox="0 0 140 100" width="76" height="54" xmlns="http://www.w3.org/2000/svg">
-  <path class="tail" d="M24 50 Q8 44 6 24 Q18 40 30 44 Z" fill="#a86a38"/>
-  <rect class="leg leg-bf" x="40" y="60" width="10" height="30" rx="5" fill="#9c6636"/>
-  <rect class="leg leg-ff" x="86" y="60" width="10" height="30" rx="5" fill="#9c6636"/>
-  <ellipse cx="60" cy="54" rx="42" ry="22" fill="#c88a52"/>
-  <ellipse cx="62" cy="62" rx="32" ry="12" fill="#ddb083"/>
-  <rect class="leg leg-bn" x="47" y="62" width="11" height="30" rx="5.5" fill="#b8794c"/>
-  <rect class="leg leg-fn" x="92" y="62" width="11" height="30" rx="5.5" fill="#b8794c"/>
-  <circle cx="104" cy="46" r="21" fill="#c88a52"/>
-  <rect x="118" y="47" width="21" height="15" rx="7.5" fill="#eccea6"/>
-  <circle cx="137" cy="54" r="3.6" fill="#33261f"/>
-  <ellipse class="ear" cx="92" cy="36" rx="9" ry="16" fill="#a86a38"/>
-  <circle cx="109" cy="43" r="3" fill="#2a201c"/>
+<svg class="dogsvg" viewBox="0 0 152 116" width="82" height="63" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="dgBody" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e3aa6b"/><stop offset="1" stop-color="#bc7d45"/>
+    </linearGradient>
+    <linearGradient id="dgLeg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c68a52"/><stop offset="1" stop-color="#9d6836"/>
+    </linearGradient>
+    <radialGradient id="dgHead" cx="0.62" cy="0.38" r="0.85">
+      <stop offset="0" stop-color="#e7ae6d"/><stop offset="1" stop-color="#bd7f42"/>
+    </radialGradient>
+  </defs>
+  <path class="tail" d="M28 58 Q10 52 7 28 Q22 46 36 50 Z" fill="#a2662f"/>
+  <rect class="leg leg-bf" x="42" y="64" width="11" height="32" rx="5.5" fill="#9d6836"/>
+  <rect class="leg leg-ff" x="86" y="64" width="11" height="32" rx="5.5" fill="#9d6836"/>
+  <ellipse cx="64" cy="58" rx="44" ry="25" fill="url(#dgBody)"/>
+  <ellipse cx="70" cy="68" rx="34" ry="14" fill="#ecc593" opacity="0.85"/>
+  <path d="M100 68 q6 10 14 7 q-2 8 -11 6 q-8 -1 -8 -8 z" fill="#e7ae6d"/>
+  <rect class="leg leg-bn" x="50" y="66" width="12" height="33" rx="6" fill="url(#dgLeg)"/>
+  <rect class="leg leg-fn" x="92" y="66" width="12" height="33" rx="6" fill="url(#dgLeg)"/>
+  <path d="M88 34 Q86 52 92 64" stroke="#c25049" stroke-width="9" fill="none" stroke-linecap="round"/>
+  <circle cx="106" cy="48" r="23" fill="url(#dgHead)"/>
+  <path class="ear" d="M96 30 Q80 28 77 52 Q77 66 89 64 Q95 50 100 36 Z" fill="#9d6836"/>
+  <path class="ear" d="M94 34 Q84 36 83 52 Q85 60 90 54 Q92 44 96 38 Z" fill="#7c4d24" opacity="0.6"/>
+  <ellipse cx="128" cy="55" rx="15" ry="12" fill="#efd3a8"/>
+  <path d="M121 60 Q129 66 138 59" stroke="#6b4a2e" stroke-width="1.7" fill="none" stroke-linecap="round"/>
+  <ellipse cx="141" cy="51" rx="4.6" ry="3.9" fill="#2f231d"/>
+  <circle cx="139.4" cy="49.5" r="1.3" fill="#7a6355"/>
+  <path d="M106 36 Q111 33.5 116 36" stroke="#a2662f" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <ellipse cx="112" cy="45" rx="3.4" ry="4.1" fill="#241c18"/>
+  <circle cx="113.3" cy="43.4" r="1.3" fill="#ffffff"/>
+  <circle cx="90" cy="63" r="5.2" fill="#ecc24a" stroke="#c39a22" stroke-width="1.4"/>
 </svg>`;
 
 const Dog = {
