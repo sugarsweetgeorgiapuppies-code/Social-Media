@@ -1,0 +1,21 @@
+# Render deploy config for the Lead & Appointment Board.
+# You can either use this as a Blueprint, or just mirror these settings when
+# creating a Web Service manually. The GoHighLevel token is NOT in here — set it
+# in the Render dashboard (Environment tab) so the secret stays out of git.
+services:
+  - type: web
+    name: ssgp-board
+    runtime: python
+    plan: free # bump to "starter" ($7/mo) if you want it always-on overnight
+    branch: claude/lead-floor-board-display-auglt0
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run.py
+    envVars:
+      - key: DAILY_RUN_ENABLED
+        value: "false" # board only — skip the social-media scheduler
+      - key: BOARD_GHL_LOCATION_ID
+        value: "7OAoy2QT49JimX9IsVnf"
+      - key: BOARD_GHL_CALENDAR_ID
+        value: "g8MCjvLjpPvyvu4k3WGG"
+      - key: BOARD_GHL_TOKEN
+        sync: false # set this in the Render dashboard (secret)
