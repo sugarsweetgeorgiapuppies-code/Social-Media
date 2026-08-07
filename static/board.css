@@ -54,7 +54,7 @@ html, body {
   transform-origin: center center;
   display: flex;
   flex-direction: column;
-  padding: 22px 26px 150px; /* extra bottom room for the dog house / floor */
+  padding: 22px 26px 162px; /* extra bottom room for the dog house / floor */
   gap: 20px;
   background:
     radial-gradient(1200px 700px at 12% -8%, #fbf8f2, transparent 60%),
@@ -79,15 +79,11 @@ html, body {
 .frame .paw.bl { bottom: 15px; left: 20px; transform: rotate(18deg); }
 .frame .paw.br { bottom: 15px; right: 20px; transform: rotate(-18deg) scaleX(-1); }
 
-/* The dog house — the pup's home in the bottom-left floor. */
-.doghouse {
-  position: absolute;
-  left: 34px;
-  bottom: 10px;
-  z-index: 19;
-  pointer-events: none;
-  filter: drop-shadow(0 8px 7px rgba(43, 48, 43, 0.14));
-}
+/* The dog house — the pup's home in the bottom-left floor. Split into a back
+   (behind the pup) and a roof (in front) so the pup nestles INSIDE. */
+.doghouse { position: absolute; left: 30px; bottom: 8px; pointer-events: none; }
+.doghouse-back { z-index: 18; }
+.doghouse-roof { z-index: 22; filter: drop-shadow(0 8px 7px rgba(43, 48, 43, 0.14)); }
 
 /* Soft, slowly drifting color orbs for a bit of life behind the panels. */
 .bg-orbs { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
@@ -444,7 +440,7 @@ html, body {
 /* --------------------------------------------------------------- the pup */
 .dog {
   position: absolute; left: 0; top: 0;
-  z-index: 26; pointer-events: none;
+  z-index: 20; pointer-events: none; /* between the house back (18) and roof (22) */
   will-change: transform;
 }
 .dog-face { transform: scaleX(1); }

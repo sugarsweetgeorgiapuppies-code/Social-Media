@@ -270,8 +270,8 @@ const Dog = {
   enabled: true,
   el: null, face: null, emo: null, sleeping: false, _zzz: null,
   W: 124, H: 94, // on-canvas footprint (matches the SVG size)
-  homeX: 88, homeY: 978, // in front of the dog house (bottom-left floor)
-  x: 88, y: 978, tx: 88, ty: 978, facing: 1,
+  homeX: 82, homeY: 986, // nestled inside the dog house (bottom-left floor)
+  x: 82, y: 986, tx: 82, ty: 986, facing: 1,
   speed: 1200, busy: false, queue: [], arrive: null, lastT: 0, nextRoam: 0,
 
   // Idle tricks the pup performs at random. Each is a CSS class + duration.

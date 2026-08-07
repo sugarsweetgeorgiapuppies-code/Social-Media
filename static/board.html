@@ -78,16 +78,23 @@
         </section>
       </main>
 
-      <div class="doghouse" aria-hidden="true">
-        <svg viewBox="0 0 210 138" width="210" height="138" xmlns="http://www.w3.org/2000/svg">
-          <rect x="42" y="66" width="126" height="66" rx="7" fill="#d29862"/>
-          <line x1="72" y1="70" x2="72" y2="130" stroke="#bd8850" stroke-width="2"/>
-          <line x1="138" y1="70" x2="138" y2="130" stroke="#bd8850" stroke-width="2"/>
-          <path d="M24 72 L105 24 L186 72 Z" fill="#a15f37"/>
-          <path d="M24 72 L105 24 L186 72" fill="none" stroke="#854626" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
-          <path d="M80 132 L80 98 a25 25 0 0 1 50 0 L130 132 Z" fill="#4a2e20"/>
-          <rect x="88" y="80" width="34" height="14" rx="4" fill="#efe1c2"/>
-          <circle cx="105" cy="46" r="4" fill="#efe1c2"/>
+      <!-- Back of the house: floor, side posts, dark interior (behind the pup). -->
+      <div class="doghouse doghouse-back" aria-hidden="true">
+        <svg viewBox="0 0 226 150" width="226" height="150" xmlns="http://www.w3.org/2000/svg">
+          <rect x="34" y="132" width="158" height="15" rx="5" fill="#a86f3d"/>
+          <rect x="32" y="66" width="17" height="76" rx="5" fill="#cf9560"/>
+          <rect x="177" y="66" width="17" height="76" rx="5" fill="#bb8650"/>
+          <path d="M49 74 H177 V136 a6 6 0 0 1 -6 6 H55 a6 6 0 0 1 -6 -6 Z" fill="#382519"/>
+        </svg>
+      </div>
+      <!-- Front of the house: the roof (in front of the pup, so it overhangs). -->
+      <div class="doghouse doghouse-roof" aria-hidden="true">
+        <svg viewBox="0 0 226 150" width="226" height="150" xmlns="http://www.w3.org/2000/svg">
+          <path d="M16 78 L113 22 L210 78 Z" fill="#a15f37"/>
+          <path d="M16 78 L113 22 L210 78" fill="none" stroke="#854626" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+          <rect x="42" y="70" width="142" height="12" rx="5" fill="#8f4f2c"/>
+          <rect x="95" y="58" width="36" height="13" rx="4" fill="#efe1c2"/>
+          <circle cx="113" cy="47" r="4" fill="#efe1c2"/>
         </svg>
       </div>
 
