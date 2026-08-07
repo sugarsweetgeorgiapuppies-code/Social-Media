@@ -250,7 +250,8 @@ const Dog = {
   enabled: true,
   el: null, face: null, emo: null,
   W: 124, H: 94, // on-canvas footprint (matches the SVG size)
-  x: 150, y: 950, tx: 150, ty: 950, facing: 1,
+  homeX: 96, homeY: 956, // the dog bed (bottom-left floor) — the pup's home
+  x: 96, y: 956, tx: 96, ty: 956, facing: 1,
   speed: 1200, busy: false, queue: [], arrive: null, lastT: 0, nextRoam: 0,
 
   // Idle tricks the pup performs at random. Each is a CSS class + duration.
@@ -302,14 +303,10 @@ const Dog = {
       if (this.queue.length) {
         this.beginKick(this.queue.shift());
       } else if (t > this.nextRoam) {
-        // When settled, either wander to a fresh clear spot or do a trick.
-        if (Math.random() < 0.5) {
-          this.doTrick();
-        } else {
-          const sp = this.safeSpot();
-          this.tx = sp.x; this.ty = sp.y;
-        }
-        this.nextRoam = t + 4500 + Math.random() * 7000;
+        // Resting in the bed: occasionally do a trick, otherwise just chill.
+        if (Math.random() < 0.6) this.doTrick();
+        this.tx = this.homeX; this.ty = this.homeY; // always come home
+        this.nextRoam = t + 6000 + Math.random() * 9000;
       }
     }
 
@@ -354,6 +351,7 @@ const Dog = {
       setTimeout(() => {
         job.done();
         this.busy = false;
+        this.tx = this.homeX; this.ty = this.homeY; // trot back to bed
         this.nextRoam = this.lastT + 4000;
       }, 680);
     };
@@ -550,7 +548,6 @@ function syncPanel(panel, list) {
   updatePanelTimers(panel); // paint colors/text before we sort by color
   reorder(panel);
   layoutRows(panel);
-  Dog.avoid(); // if a new card landed on the pup, it scampers clear
 }
 
 /** Sort by urgency color, not time alone.
