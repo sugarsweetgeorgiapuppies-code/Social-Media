@@ -54,7 +54,7 @@ html, body {
   transform-origin: center center;
   display: flex;
   flex-direction: column;
-  padding: 22px 26px 162px; /* extra bottom room for the dog house / floor */
+  padding: 22px 26px 104px; /* bottom room for the floor; panels run lower now */
   gap: 20px;
   background:
     radial-gradient(1200px 700px at 12% -8%, #fbf8f2, transparent 60%),
@@ -81,7 +81,7 @@ html, body {
 
 /* The dog house — the pup's home in the bottom-left floor. Split into a back
    (behind the pup) and a roof (in front) so the pup nestles INSIDE. */
-.doghouse { position: absolute; left: 30px; bottom: 8px; pointer-events: none; }
+.doghouse { position: absolute; right: 34px; bottom: 8px; pointer-events: none; }
 .doghouse-back { z-index: 18; }
 .doghouse-roof { z-index: 22; filter: drop-shadow(0 8px 7px rgba(43, 48, 43, 0.14)); }
 
@@ -219,7 +219,7 @@ html, body {
 /* --------------------------------------------------------- stale indicator */
 .stale {
   position: absolute;
-  bottom: 30px; right: 34px;
+  bottom: 30px; left: 34px;
   z-index: 5;
   display: flex; align-items: center; gap: 10px;
   padding: 11px 20px;

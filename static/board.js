@@ -40,7 +40,7 @@ const ALL_LEVEL_CLASSES = [
    size — never squished. If a panel has more than fit, the extra (least urgent)
    ones are held back and shown as a "+N more waiting" chip; they appear as the
    urgent ones at the top get handled and drop off. */
-const CARD_ROW_PX = 100;
+const CARD_ROW_PX = 120;
 
 /* Friendly avatar colors, picked per name for a bit of life. */
 const AVATAR_COLORS = [
@@ -270,8 +270,8 @@ const Dog = {
   enabled: true,
   el: null, face: null, emo: null, sleeping: false, _zzz: null,
   W: 124, H: 94, // on-canvas footprint (matches the SVG size)
-  homeX: 82, homeY: 986, // nestled inside the dog house (bottom-left floor)
-  x: 82, y: 986, tx: 82, ty: 986, facing: 1,
+  homeX: 1711, homeY: 986, // nestled inside the dog house (bottom-right floor)
+  x: 1711, y: 986, tx: 1711, ty: 986, facing: 1,
   speed: 1200, busy: false, queue: [], arrive: null, lastT: 0, nextRoam: 0,
 
   // Idle tricks the pup performs at random. Each is a CSS class + duration.
