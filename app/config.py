@@ -71,10 +71,13 @@ class Settings:
     BOARD_DEV_MODE = _bool("BOARD_DEV_MODE", not BOARD_FEED_URL)
     # Name shown in the board header.
     BOARD_STORE_NAME = os.getenv("BOARD_STORE_NAME", BUSINESS_NAME).strip()
-    # How often the browser re-polls the feed (seconds).
-    BOARD_POLL_SECONDS = int(os.getenv("BOARD_POLL_SECONDS", "60"))
+    # How often the browser re-polls the feed (seconds). 15 is a good live-but-
+    # gentle value now that the feed is served directly (no n8n execution cost).
+    # Going lower gives no visible benefit — the on-screen timers already tick
+    # every second on their own — and just adds GoHighLevel API traffic.
+    BOARD_POLL_SECONDS = int(os.getenv("BOARD_POLL_SECONDS", "15"))
     # No successful poll within this window => show "connection lost".
-    BOARD_STALE_SECONDS = int(os.getenv("BOARD_STALE_SECONDS", "180"))
+    BOARD_STALE_SECONDS = int(os.getenv("BOARD_STALE_SECONDS", "90"))
     # Seconds to wait on the upstream feed before treating it as failed.
     BOARD_FEED_TIMEOUT = int(os.getenv("BOARD_FEED_TIMEOUT", "10"))
 
@@ -85,8 +88,9 @@ class Settings:
     BOARD_GHL_LOCATION_ID = os.getenv("BOARD_GHL_LOCATION_ID", "").strip()
     BOARD_GHL_CALENDAR_ID = os.getenv("BOARD_GHL_CALENDAR_ID", "").strip()
     BOARD_GHL_PIPELINE = os.getenv("BOARD_GHL_PIPELINE", "General Inquiry").strip()
-    # Cache the GHL result this many seconds (rapid polls reuse it).
-    BOARD_GHL_CACHE_SECONDS = int(os.getenv("BOARD_GHL_CACHE_SECONDS", "30"))
+    # Cache the GHL result this many seconds. Kept at/under the poll interval so
+    # each refresh is fresh, while still absorbing rapid polls / multiple tabs.
+    BOARD_GHL_CACHE_SECONDS = int(os.getenv("BOARD_GHL_CACHE_SECONDS", "12"))
 
     @property
     def board_ghl_enabled(self) -> bool:

@@ -44,7 +44,7 @@ const CARD_ROW_PX = 116;
 
 /* Fallbacks — overridden at runtime by /board/config. */
 const CONFIG = {
-  pollSeconds: 60, // re-poll the feed (also set via BOARD_POLL_SECONDS)
+  pollSeconds: 15, // re-poll the feed (also set via BOARD_POLL_SECONDS)
   staleSeconds: 90, // no successful poll within this => "connection lost"
   feedUrl: "/board/feed",
   configUrl: "/board/config",
