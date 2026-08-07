@@ -351,6 +351,19 @@ html, body {
 }
 .empty .em-sub { font-size: 22px; font-weight: 600; }
 
+/* "+N more waiting" chip shown when a panel has more cards than fit. */
+.overflow-chip {
+  align-self: center;
+  justify-self: center;
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--ink-soft);
+  background: var(--cream);
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 26px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .card, .card.lvl-red, .stale .dot { animation: none; }
 }

@@ -34,9 +34,11 @@ const ALL_LEVEL_CLASSES = [
   "lvl-green", "lvl-blue", "lvl-blush", "lvl-orange", "lvl-red", "lvl-neutral",
 ];
 
-/* Max card height (px on the 1920x1080 canvas). Cards keep this size and pack
-   from the top; they only shrink below it when a panel has too many to fit. */
-const CARD_MAX_ROW = 150;
+/* Fixed card height (px on the 1920x1080 canvas). Cards always render at this
+   size — never squished. If a panel has more than fit, the extra (least urgent)
+   ones are held back and shown as a "+N more waiting" chip; they appear as the
+   urgent ones at the top get handled and drop off. */
+const CARD_ROW_PX = 116;
 
 /* Fallbacks — overridden at runtime by /board/config. */
 const CONFIG = {
@@ -256,15 +258,32 @@ function reorder(panel) {
 
 /** Rows = card count, so cards share the panel height evenly (never overflow). */
 function layoutRows(panel) {
-  const live = [...panel.items.values()].filter(
-    (e) => !e.el.classList.contains("leaving"));
-  panel.root.querySelectorAll(".empty").forEach((n) => n.remove());
-  if (live.length === 0) {
-    panel.root.style.gridTemplateRows = "1fr";
-    panel.root.appendChild(emptyState(panel.kind));
-  } else {
-    panel.root.style.gridTemplateRows =
-      `repeat(${live.length}, minmax(0, ${CARD_MAX_ROW}px))`;
+  const root = panel.root;
+  root.querySelectorAll(".overflow-chip, .empty").forEach((n) => n.remove());
+  const cards = [...root.querySelectorAll(".card:not(.leaving)")];
+
+  if (cards.length === 0) {
+    root.style.gridTemplateRows = "1fr";
+    root.style.gridAutoRows = "";
+    root.appendChild(emptyState(panel.kind));
+    return;
+  }
+
+  // Fixed-height rows: cards never squish.
+  root.style.gridTemplateRows = "none";
+  root.style.gridAutoRows = CARD_ROW_PX + "px";
+  cards.forEach((c) => (c.style.display = ""));
+
+  // How many fit at full size? Hide the rest (least urgent, at the bottom).
+  const GAP = 14;
+  const fit = Math.max(1, Math.floor((root.clientHeight + GAP) / (CARD_ROW_PX + GAP)));
+  if (cards.length > fit) {
+    const showN = Math.max(1, fit - 1); // reserve a row for the chip
+    cards.forEach((c, i) => (c.style.display = i < showN ? "" : "none"));
+    const chip = document.createElement("div");
+    chip.className = "overflow-chip";
+    chip.textContent = `+${cards.length - showN} more waiting`;
+    root.appendChild(chip);
   }
 }
 
