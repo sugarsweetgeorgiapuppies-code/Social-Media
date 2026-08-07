@@ -40,7 +40,34 @@ const ALL_LEVEL_CLASSES = [
    size — never squished. If a panel has more than fit, the extra (least urgent)
    ones are held back and shown as a "+N more waiting" chip; they appear as the
    urgent ones at the top get handled and drop off. */
-const CARD_ROW_PX = 116;
+const CARD_ROW_PX = 100;
+
+/* Friendly avatar colors, picked per name for a bit of life. */
+const AVATAR_COLORS = [
+  "#6C8EF5", "#F2789F", "#3FB6A8", "#F5A65B", "#9B8CFF", "#5BC0EB", "#EC6A88",
+];
+/* Little icons for the inquiry source. Unknown sources get a neutral dot. */
+const SOURCE_ICON = {
+  "web form": "📝", "facebook": "📘", "google": "🔎", "phone": "📞",
+  "walk-in": "🚶", "walk in": "🚶", "instagram": "📸", "missed call": "📵",
+  "sms": "💬", "email": "✉️", "referral": "🤝", "website": "🌐",
+};
+
+function initials(name) {
+  const p = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (!p.length) return "?";
+  return (p[0][0] + (p.length > 1 ? p[p.length - 1][0] : "")).toUpperCase();
+}
+function avatarColor(name) {
+  let h = 0;
+  for (const c of String(name || "")) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+}
+function sourceLabel(src) {
+  const s = String(src || "").trim();
+  if (!s) return "";
+  return `${SOURCE_ICON[s.toLowerCase()] || "•"} ${s}`;
+}
 
 /* Fallbacks — overridden at runtime by /board/config. */
 const CONFIG = {
@@ -131,22 +158,26 @@ const Chime = {
     } catch (_) { /* silent if unavailable */ }
   },
   disable() { this.on = false; },
-  play() {
+  _tone(freqs, gain = 0.25, step = 0.18, dur = 0.16) {
     if (!this.on || !this.ctx) return;
     const t0 = this.ctx.currentTime;
-    [880, 660].forEach((freq, i) => {
+    freqs.forEach((freq, i) => {
       const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
+      const g = this.ctx.createGain();
       osc.type = "sine";
       osc.frequency.value = freq;
-      const start = t0 + i * 0.18;
-      gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(0.25, start + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.16);
-      osc.connect(gain).connect(this.ctx.destination);
-      osc.start(start); osc.stop(start + 0.18);
+      const start = t0 + i * step;
+      g.gain.setValueAtTime(0.0001, start);
+      g.gain.exponentialRampToValueAtTime(gain, start + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+      osc.connect(g).connect(this.ctx.destination);
+      osc.start(start); osc.stop(start + dur + 0.02);
     });
   },
+  // Descending alert when a card crosses into red.
+  play() { this._tone([880, 660]); },
+  // Bright rising ding when a new inquiry arrives.
+  newInquiry() { this._tone([660, 990], 0.3, 0.14, 0.22); },
 };
 
 /* -------------------------------------------------------------- feed/state */
@@ -159,68 +190,55 @@ const panels = {
 
 let lastOkMs = now();
 let hasLoaded = false;
+let seededOnce = false; // true after the first poll, so we don't ding on load
 
 /* -------------------------------------------------------------- rendering */
 
-function leadCardHTML(d) {
+function leadCardHTML() {
   return `
-    <div class="card-line1">
-      <span class="card-name">${esc(d.name)}</span>
-      <span class="badge">${esc(d.source || "—")}</span>
-      <span class="card-timer">--:--</span>
+    <div class="avatar"></div>
+    <div class="cmain">
+      <div class="card-name"></div>
+      <div class="card-sub"><span class="meta src"></span></div>
     </div>
-    <div class="card-line2">
-      <span class="meta rep"></span>
-      <span class="sep sep-int" hidden>·</span>
-      <span class="meta interest"></span>
-    </div>`;
+    <div class="card-timer">--:--</div>`;
 }
 
-function apptCardHTML(d, appointmentMs) {
+function apptCardHTML() {
   return `
-    <div class="card-line1">
-      <span class="card-name">${esc(d.name)}</span>
-      <span class="card-timer appt-time">${esc(fmtClock(appointmentMs))}</span>
+    <div class="avatar"></div>
+    <div class="cmain">
+      <div class="card-name"></div>
+      <div class="card-sub">
+        <span class="meta countdown"></span>
+        <span class="sep sep-int" hidden>·</span>
+        <span class="meta interest"></span>
+      </div>
     </div>
-    <div class="card-line2">
-      <span class="meta countdown"></span>
-      <span class="sep sep-int" hidden>·</span>
-      <span class="meta interest"></span>
-      <span class="sep sep-assoc" hidden>·</span>
-      <span class="meta assoc"></span>
-    </div>`;
+    <div class="card-timer appt-time"></div>`;
 }
 
-/** Set an assignee <span>, applying the red "alert" style when empty. */
-function setAssignee(el, sel, value, emptyLabel) {
-  const a = el.querySelector(sel);
-  if (value) { a.textContent = value; a.classList.remove("alert"); }
-  else { a.textContent = emptyLabel; a.classList.add("alert"); }
+/** Toggle a metadata span + its leading separator based on whether it has text. */
+function setMeta(el, sel, sepSel, value) {
+  const m = el.querySelector(sel);
+  m.textContent = value || "";
+  m.style.display = value ? "" : "none";
+  if (sepSel) el.querySelector(sepSel).hidden = !value;
 }
 
 function refreshCardFields(entry, d, kind) {
   const el = entry.el;
+  const name = d.name ?? "";
+  el.querySelector(".card-name").textContent = name;
+  const av = el.querySelector(".avatar");
+  av.textContent = initials(name);
+  av.style.background = avatarColor(name);
+
   if (kind === "lead") {
-    el.querySelector(".card-name").textContent = d.name ?? "";
-    el.querySelector(".badge").textContent = d.source || "—";
-    setAssignee(el, ".rep", d.assignedTo, "UNASSIGNED");
-    // Show the puppy/breed interest only when the feed provides one.
-    const interest = (d.interest || "").trim();
-    el.querySelector(".interest").textContent = interest;
-    el.querySelector(".interest").style.display = interest ? "" : "none";
-    el.querySelector(".sep-int").hidden = !interest;
+    setMeta(el, ".src", null, sourceLabel(d.source));
   } else {
-    el.querySelector(".card-name").textContent = d.name ?? "";
     el.querySelector(".appt-time").textContent = fmtClock(entry.sortMs);
-    // Show interest and associate only when present — no "—", no "NO ASSOCIATE".
-    const interest = (d.interest || "").trim();
-    el.querySelector(".interest").textContent = interest;
-    el.querySelector(".interest").style.display = interest ? "" : "none";
-    el.querySelector(".sep-int").hidden = !interest;
-    const assoc = (d.assignedTo || "").trim();
-    el.querySelector(".assoc").textContent = assoc;
-    el.querySelector(".assoc").style.display = assoc ? "" : "none";
-    el.querySelector(".sep-assoc").hidden = !assoc;
+    setMeta(el, ".interest", ".sep-int", (d.interest || "").trim());
     el.classList.toggle("unconfirmed", !d.confirmed);
   }
 }
@@ -254,6 +272,8 @@ function syncPanel(panel, list) {
       panel.items.set(id, entry);
       panel.root.appendChild(el);
       refreshCardFields(entry, d, panel.kind);
+      // Ding when a genuinely new inquiry arrives (not on the first load).
+      if (seededOnce && panel.kind === "lead") Chime.newInquiry();
     } else {
       entry.sortMs = sortMs;
       refreshCardFields(entry, d, panel.kind);
@@ -435,6 +455,7 @@ async function poll() {
     updateHeaderCounts(data, today.length);
     updateTomorrowChip(tomorrow);
     updateStale();
+    seededOnce = true; // subsequent new inquiries may ding
   } catch (err) {
     console.warn("Feed poll failed:", err.message);
     updateStale();
@@ -475,6 +496,7 @@ function wireChimeToggle() {
       Chime.enable();
       btn.setAttribute("aria-pressed", "true");
       btn.querySelector(".chime-ic").textContent = "🔔";
+      Chime.newInquiry(); // confirmation ding — also unlocks browser audio
     }
   });
 }

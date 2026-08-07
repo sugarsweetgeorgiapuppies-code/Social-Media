@@ -18,6 +18,7 @@ import json
 import time
 import urllib.parse
 import urllib.request
+from zoneinfo import ZoneInfo
 
 from .config import settings
 from .logging_config import get_logger
@@ -58,6 +59,17 @@ def _iso(value) -> str:
     return str(value or "")
 
 
+def _parse_dt(value) -> dt.datetime | None:
+    """Parse an ISO string or epoch ms into an aware datetime, or None."""
+    if isinstance(value, (int, float)):
+        return dt.datetime.fromtimestamp(value / 1000, dt.timezone.utc)
+    try:
+        d = dt.datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return d if d.tzinfo else d.replace(tzinfo=dt.timezone.utc)
+    except (ValueError, TypeError):
+        return None
+
+
 def build_feed() -> dict:
     """Assemble the board feed from live GoHighLevel data (cached briefly)."""
     now = time.time()
@@ -86,10 +98,20 @@ def build_feed() -> dict:
 
     # --- New Inquiries (General Inquiry pipeline, not Appointment Booked) ----
     opp_resp = _get("/opportunities/search", {"location_id": loc, "limit": 100})
+    try:
+        tz = ZoneInfo(settings.TIMEZONE)
+    except Exception:
+        tz = dt.timezone.utc
+    today = dt.datetime.now(tz).date()
+
     inquiries = []
+    inquiries_today = 0  # everyone who came in today, even if already handled
     for o in opp_resp.get("opportunities", []):
         if o.get("pipelineId") != gi.get("id"):
             continue
+        created = _parse_dt(o.get("createdAt"))
+        if created and created.astimezone(tz).date() == today:
+            inquiries_today += 1
         if "appointment" in stage_name.get(o.get("pipelineStageId"), ""):
             continue
         contact = o.get("contact") or {}
@@ -140,7 +162,7 @@ def build_feed() -> dict:
         "floor": [],
         "generatedAt": dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
             .isoformat().replace("+00:00", "Z"),
-        "stats": {"inquiriesToday": len(inquiries)},
+        "stats": {"inquiriesToday": inquiries_today},
     }
     _cache["at"] = now
     _cache["data"] = feed
