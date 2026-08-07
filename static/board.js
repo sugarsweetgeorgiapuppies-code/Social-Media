@@ -324,13 +324,18 @@ const Dog = {
         this.wake();
         this.beginKick(this.queue.shift());
       } else if (!this.sleeping && t > this.nextRoam) {
-        // Home with nothing to do: usually curl up and sleep; sometimes a trick.
         this.tx = this.homeX; this.ty = this.homeY;
-        if (Math.random() < 0.22) {
+        const waiting = document.querySelectorAll(
+          "#leads .card:not(.leaving):not(.kicked)").length > 0;
+        if (waiting) {
+          // People are waiting — stay awake and alert; a trick now and then.
+          if (Math.random() < 0.3) this.doTrick();
+          this.nextRoam = t + 6000 + Math.random() * 7000;
+        } else if (Math.random() < 0.2) {
           this.doTrick();
           this.nextRoam = t + 7000 + Math.random() * 7000;
         } else {
-          this.sleep();
+          this.sleep(); // all caught up — nap time
         }
       }
     }
@@ -588,8 +593,11 @@ function syncPanel(panel, list) {
       panel.items.set(id, entry);
       panel.root.appendChild(el);
       refreshCardFields(entry, d, panel.kind);
-      // Ding when a genuinely new inquiry arrives (not on the first load).
-      if (seededOnce && panel.kind === "lead") Chime.newInquiry();
+      // A new inquiry means someone's waiting — wake the pup up.
+      if (panel.kind === "lead") {
+        Dog.wake();
+        if (seededOnce) Chime.newInquiry();
+      }
     } else {
       entry.sortMs = sortMs;
       refreshCardFields(entry, d, panel.kind);
