@@ -246,12 +246,32 @@ const DOG_SVG = `
   <circle cx="94" cy="64" r="5" fill="#ecc24a" stroke="#c39a22" stroke-width="1.3"/>
 </svg>`;
 
+/* Curled-up sleeping poodle (solid fills so it needs no shared <defs>). */
+const DOG_SLEEP_SVG = `
+<svg class="dogsvg" viewBox="0 0 150 92" width="124" height="76" xmlns="http://www.w3.org/2000/svg">
+  <ellipse cx="78" cy="80" rx="58" ry="10" fill="#2b302b" opacity="0.08"/>
+  <g fill="#eed9b2">
+    <circle cx="74" cy="58" r="26"/><circle cx="48" cy="60" r="19"/><circle cx="100" cy="58" r="20"/>
+    <circle cx="62" cy="44" r="16"/><circle cx="88" cy="44" r="16"/><circle cx="76" cy="38" r="15"/>
+    <circle cx="114" cy="62" r="13"/>
+  </g>
+  <ellipse cx="76" cy="62" rx="44" ry="18" fill="#ddbd8f"/>
+  <circle cx="46" cy="62" r="18" fill="#e6c592"/>
+  <g fill="#eed9b2"><circle cx="36" cy="54" r="10"/><circle cx="48" cy="50" r="10"/><circle cx="58" cy="56" r="9"/></g>
+  <circle cx="46" cy="62" r="13" fill="#e6c592"/>
+  <ellipse cx="30" cy="68" rx="13" ry="8.5" fill="#e4c491"/>
+  <circle cx="19" cy="68" r="3.7" fill="#2f231d"/>
+  <path d="M39 63 q4.5 3.5 9 0" stroke="#3a2c22" stroke-width="1.9" fill="none" stroke-linecap="round"/>
+  <path d="M52 52 q11 -5 15 7 q-7 5 -15 1 z" fill="#d3ac7a"/>
+  <circle cx="58" cy="70" r="4.6" fill="#ecc24a" stroke="#c39a22" stroke-width="1.2"/>
+</svg>`;
+
 const Dog = {
   enabled: true,
-  el: null, face: null, emo: null,
+  el: null, face: null, emo: null, sleeping: false, _zzz: null,
   W: 124, H: 94, // on-canvas footprint (matches the SVG size)
-  homeX: 96, homeY: 956, // the dog bed (bottom-left floor) — the pup's home
-  x: 96, y: 956, tx: 96, ty: 956, facing: 1,
+  homeX: 88, homeY: 978, // in front of the dog house (bottom-left floor)
+  x: 88, y: 978, tx: 88, ty: 978, facing: 1,
   speed: 1200, busy: false, queue: [], arrive: null, lastT: 0, nextRoam: 0,
 
   // Idle tricks the pup performs at random. Each is a CSS class + duration.
@@ -301,12 +321,17 @@ const Dog = {
 
     if (dist <= 2 && !this.arrive && !this.busy) {
       if (this.queue.length) {
+        this.wake();
         this.beginKick(this.queue.shift());
-      } else if (t > this.nextRoam) {
-        // Resting in the bed: occasionally do a trick, otherwise just chill.
-        if (Math.random() < 0.6) this.doTrick();
-        this.tx = this.homeX; this.ty = this.homeY; // always come home
-        this.nextRoam = t + 6000 + Math.random() * 9000;
+      } else if (!this.sleeping && t > this.nextRoam) {
+        // Home with nothing to do: usually curl up and sleep; sometimes a trick.
+        this.tx = this.homeX; this.ty = this.homeY;
+        if (Math.random() < 0.22) {
+          this.doTrick();
+          this.nextRoam = t + 7000 + Math.random() * 7000;
+        } else {
+          this.sleep();
+        }
       }
     }
 
@@ -435,6 +460,32 @@ const Dog = {
     bub.style.top = (this.y - 22) + "px";
     document.getElementById("stage").appendChild(bub);
     setTimeout(() => bub.remove(), 900);
+  },
+
+  /** Curl up and sleep (with floating Zzz) — the idle state. */
+  sleep() {
+    if (this.sleeping) return;
+    this.sleeping = true;
+    this.face.style.transform = "scaleX(1)";
+    this.emo.classList.remove("running", "kicking");
+    this.emo.classList.add("sleeping");
+    this.emo.innerHTML = DOG_SLEEP_SVG;
+    const z = document.createElement("div");
+    z.className = "zzz";
+    z.textContent = "z Z z";
+    z.style.left = (this.x + 22) + "px";
+    z.style.top = (this.y - 6) + "px";
+    document.getElementById("stage").appendChild(z);
+    this._zzz = z;
+  },
+
+  /** Wake up and stand back on all fours. */
+  wake() {
+    if (!this.sleeping) return;
+    this.sleeping = false;
+    this.emo.classList.remove("sleeping");
+    this.emo.innerHTML = DOG_SVG;
+    if (this._zzz) { this._zzz.remove(); this._zzz = null; }
   },
 };
 

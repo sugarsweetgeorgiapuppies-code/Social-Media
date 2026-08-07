@@ -54,7 +54,7 @@ html, body {
   transform-origin: center center;
   display: flex;
   flex-direction: column;
-  padding: 22px 26px 130px; /* extra bottom room for the dog bed / floor */
+  padding: 22px 26px 150px; /* extra bottom room for the dog house / floor */
   gap: 20px;
   background:
     radial-gradient(1200px 700px at 12% -8%, #fbf8f2, transparent 60%),
@@ -79,14 +79,14 @@ html, body {
 .frame .paw.bl { bottom: 15px; left: 20px; transform: rotate(18deg); }
 .frame .paw.br { bottom: 15px; right: 20px; transform: rotate(-18deg) scaleX(-1); }
 
-/* The dog bed — the pup's home in the bottom-left floor. */
-.dogbed {
+/* The dog house — the pup's home in the bottom-left floor. */
+.doghouse {
   position: absolute;
-  left: 46px;
-  bottom: 16px;
-  z-index: 20;
+  left: 34px;
+  bottom: 10px;
+  z-index: 19;
   pointer-events: none;
-  filter: drop-shadow(0 7px 6px rgba(43, 48, 43, 0.12));
+  filter: drop-shadow(0 8px 7px rgba(43, 48, 43, 0.14));
 }
 
 /* Soft, slowly drifting color orbs for a bit of life behind the panels. */
@@ -525,6 +525,21 @@ html, body {
   20% { transform: rotate(-9deg) translateY(-6px); }
   45% { transform: rotate(2deg); }
   65% { transform: rotate(-6deg) translateY(-4px); }
+}
+
+/* Sleeping: slow, deep breaths + floating Zzz. */
+.dog-emo.sleeping { animation: sleepbreathe 3.4s ease-in-out infinite; }
+@keyframes sleepbreathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035); } }
+.zzz {
+  position: absolute; z-index: 27; pointer-events: none;
+  font-family: var(--font-display); font-weight: 600;
+  font-size: 26px; letter-spacing: 4px; color: var(--muted);
+  animation: zzz 2.6s ease-in-out infinite;
+}
+@keyframes zzz {
+  0% { opacity: 0; transform: translateY(4px) rotate(-4deg); }
+  25% { opacity: 0.8; }
+  100% { opacity: 0; transform: translateY(-34px) rotate(8deg); }
 }
 
 /* "Woof!" speech bubble. */
