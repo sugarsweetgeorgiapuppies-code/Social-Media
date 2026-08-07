@@ -423,19 +423,42 @@ html, body {
 }
 .dog-face { transform: scaleX(1); }
 .dog-emo {
-  font-size: 50px; line-height: 1; display: block;
+  display: block; line-height: 0;
   transform-origin: center bottom;
   filter: drop-shadow(0 7px 5px rgba(43, 48, 43, 0.2));
 }
+.dogsvg { display: block; }
+/* subtle body bob while trotting; a lean during the kick */
 .dog-emo.running { animation: trot 0.26s linear infinite; }
-@keyframes trot { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes trot { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
 .dog-emo.kicking { animation: kickpose 0.36s ease; }
 @keyframes kickpose {
   0% { transform: rotate(0); }
-  35% { transform: rotate(-20deg) translateX(-5px); }
-  65% { transform: rotate(12deg); }
+  35% { transform: rotate(-14deg) translateX(-4px); }
+  65% { transform: rotate(8deg); }
   100% { transform: rotate(0); }
 }
+
+/* --- articulated bits ---------------------------------------------------- */
+.dogsvg .leg { transform-box: fill-box; transform-origin: 50% 4px; }
+.dogsvg .tail {
+  transform-box: fill-box; transform-origin: 85% 90%;
+  animation: wag 0.5s ease-in-out infinite;
+}
+.dogsvg .ear { transform-box: fill-box; transform-origin: 50% 12%; }
+@keyframes wag { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(16deg); } }
+
+/* Galloping gait: diagonal leg pairs swing in opposite phase. */
+.dog-emo.running .leg-fn, .dog-emo.running .leg-bf { animation: legA 0.26s linear infinite; }
+.dog-emo.running .leg-ff, .dog-emo.running .leg-bn { animation: legB 0.26s linear infinite; }
+@keyframes legA { 0%, 100% { transform: rotate(30deg); } 50% { transform: rotate(-30deg); } }
+@keyframes legB { 0%, 100% { transform: rotate(-30deg); } 50% { transform: rotate(30deg); } }
+.dog-emo.running .ear { animation: earflop 0.26s linear infinite; }
+@keyframes earflop { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-14deg); } }
+
+/* The punt: a back leg swings hard forward. */
+.dog-emo.kicking .leg-bn { animation: kickleg 0.36s ease; }
+@keyframes kickleg { 0% { transform: rotate(-25deg); } 45% { transform: rotate(70deg); } 100% { transform: rotate(-20deg); } }
 
 /* Card being punted off the board by the pup. */
 .card.awaiting-kick { pointer-events: none; }
@@ -462,5 +485,6 @@ html, body {
 
 @media (prefers-reduced-motion: reduce) {
   .card, .card.lvl-red, .stale .dot, .counter .dot,
-  .bg-orbs::before, .bg-orbs::after, .empty .em-ic, .dog-emo { animation: none; }
+  .bg-orbs::before, .bg-orbs::after, .empty .em-ic,
+  .dog-emo, .dogsvg .leg, .dogsvg .tail, .dogsvg .ear { animation: none; }
 }

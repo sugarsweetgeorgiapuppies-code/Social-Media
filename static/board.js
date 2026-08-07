@@ -183,9 +183,26 @@ const Chime = {
 };
 
 /* --------------------------------------------------------------------- dog */
-/* A playful pup that trots along the bottom and, when an inquiry is handled,
-   dashes over and punts the card off the screen. Purely for delight; it is
-   disabled automatically when the viewer prefers reduced motion. */
+/* A hand-drawn side-view puppy (SVG) whose legs gallop, ears flop, and tail
+   wags — a real little character, not an emoji. It trots along the bottom and,
+   when an inquiry is handled, dashes over and punts the card off the screen.
+   Disabled automatically when the viewer prefers reduced motion. */
+const DOG_SVG = `
+<svg class="dogsvg" viewBox="0 0 140 100" width="76" height="54" xmlns="http://www.w3.org/2000/svg">
+  <path class="tail" d="M24 50 Q8 44 6 24 Q18 40 30 44 Z" fill="#a86a38"/>
+  <rect class="leg leg-bf" x="40" y="60" width="10" height="30" rx="5" fill="#9c6636"/>
+  <rect class="leg leg-ff" x="86" y="60" width="10" height="30" rx="5" fill="#9c6636"/>
+  <ellipse cx="60" cy="54" rx="42" ry="22" fill="#c88a52"/>
+  <ellipse cx="62" cy="62" rx="32" ry="12" fill="#ddb083"/>
+  <rect class="leg leg-bn" x="47" y="62" width="11" height="30" rx="5.5" fill="#b8794c"/>
+  <rect class="leg leg-fn" x="92" y="62" width="11" height="30" rx="5.5" fill="#b8794c"/>
+  <circle cx="104" cy="46" r="21" fill="#c88a52"/>
+  <rect x="118" y="47" width="21" height="15" rx="7.5" fill="#eccea6"/>
+  <circle cx="137" cy="54" r="3.6" fill="#33261f"/>
+  <ellipse class="ear" cx="92" cy="36" rx="9" ry="16" fill="#a86a38"/>
+  <circle cx="109" cy="43" r="3" fill="#2a201c"/>
+</svg>`;
+
 const Dog = {
   enabled: true,
   el: null, face: null, emo: null,
@@ -203,7 +220,7 @@ const Dog = {
     this.face.className = "dog-face";
     this.emo = document.createElement("div");
     this.emo.className = "dog-emo";
-    this.emo.textContent = "🐕";
+    this.emo.innerHTML = DOG_SVG;
     this.face.appendChild(this.emo);
     this.el.appendChild(this.face);
     stage.appendChild(this.el);
