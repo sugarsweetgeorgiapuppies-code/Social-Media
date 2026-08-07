@@ -415,7 +415,52 @@ html, body {
   padding: 8px 24px;
 }
 
+/* --------------------------------------------------------------- the pup */
+.dog {
+  position: absolute; left: 0; top: 0;
+  z-index: 26; pointer-events: none;
+  will-change: transform;
+}
+.dog-face { transform: scaleX(1); }
+.dog-emo {
+  font-size: 50px; line-height: 1; display: block;
+  transform-origin: center bottom;
+  filter: drop-shadow(0 7px 5px rgba(43, 48, 43, 0.2));
+}
+.dog-emo.running { animation: trot 0.26s linear infinite; }
+@keyframes trot { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+.dog-emo.kicking { animation: kickpose 0.36s ease; }
+@keyframes kickpose {
+  0% { transform: rotate(0); }
+  35% { transform: rotate(-20deg) translateX(-5px); }
+  65% { transform: rotate(12deg); }
+  100% { transform: rotate(0); }
+}
+
+/* Card being punted off the board by the pup. */
+.card.awaiting-kick { pointer-events: none; }
+.card.kicked {
+  z-index: 30; pointer-events: none;
+  animation: punt 0.72s cubic-bezier(0.34, 0.8, 0.4, 1) forwards;
+}
+@keyframes punt {
+  0% { transform: none; }
+  12% { transform: translateX(-12px) rotate(-3deg); }
+  100% { transform: translate(58%, -165%) rotate(26deg); opacity: 0; }
+}
+
+/* Little dust puff where the kick connects. */
+.puff {
+  position: absolute; z-index: 29; pointer-events: none;
+  font-size: 34px;
+  animation: puff 0.72s ease-out forwards;
+}
+@keyframes puff {
+  0% { opacity: 0.9; transform: scale(0.5); }
+  100% { opacity: 0; transform: translateY(-26px) scale(1.4); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .card, .card.lvl-red, .stale .dot, .counter .dot,
-  .bg-orbs::before, .bg-orbs::after, .empty .em-ic { animation: none; }
+  .bg-orbs::before, .bg-orbs::after, .empty .em-ic, .dog-emo { animation: none; }
 }

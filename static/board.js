@@ -178,6 +178,109 @@ const Chime = {
   play() { this._tone([880, 660]); },
   // Bright rising ding when a new inquiry arrives.
   newInquiry() { this._tone([660, 990], 0.3, 0.14, 0.22); },
+  // Playful little pop for the puppy's kick.
+  boing() { this._tone([300, 560, 380], 0.26, 0.07, 0.12); },
+};
+
+/* --------------------------------------------------------------------- dog */
+/* A playful pup that trots along the bottom and, when an inquiry is handled,
+   dashes over and punts the card off the screen. Purely for delight; it is
+   disabled automatically when the viewer prefers reduced motion. */
+const Dog = {
+  enabled: true,
+  el: null, face: null, emo: null,
+  x: 150, y: 992, tx: 150, ty: 992, facing: 1,
+  speed: 1100, busy: false, queue: [], arrive: null, lastT: 0, nextRoam: 0,
+
+  init() {
+    try {
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches) { this.enabled = false; return; }
+    } catch (_) { /* keep enabled */ }
+    const stage = document.getElementById("stage");
+    this.el = document.createElement("div");
+    this.el.className = "dog";
+    this.face = document.createElement("div");
+    this.face.className = "dog-face";
+    this.emo = document.createElement("div");
+    this.emo.className = "dog-emo";
+    this.emo.textContent = "🐕";
+    this.face.appendChild(this.emo);
+    this.el.appendChild(this.face);
+    stage.appendChild(this.el);
+    this.place();
+    const loop = (t) => { this.step(t); requestAnimationFrame(loop); };
+    requestAnimationFrame(loop);
+  },
+
+  place() { this.el.style.transform = `translate(${this.x}px, ${this.y}px)`; },
+
+  /** Queue a card to be punted; `done` removes it once the pup connects. */
+  kick(cardEl, done) {
+    if (!this.enabled) { done(); return; }
+    this.queue.push({ cardEl, done });
+  },
+
+  step(t) {
+    const dt = this.lastT ? Math.min(0.05, (t - this.lastT) / 1000) : 0;
+    this.lastT = t;
+    const dx = this.tx - this.x, dy = this.ty - this.y;
+    const dist = Math.hypot(dx, dy);
+
+    if (dist <= 2 && !this.arrive) {
+      if (!this.busy && this.queue.length) {
+        this.beginKick(this.queue.shift());
+      } else if (!this.busy && t > this.nextRoam) {
+        this.tx = 140 + Math.random() * 1600;
+        this.ty = 968 + Math.random() * 22;
+        this.nextRoam = t + 14000 + Math.random() * 14000;
+      }
+    }
+
+    if (dist > 2) {
+      this.facing = dx < 0 ? -1 : 1;
+      this.face.style.transform = `scaleX(${this.facing})`;
+      const step = Math.min(dist, this.speed * dt);
+      this.x += (dx / dist) * step;
+      this.y += (dy / dist) * step;
+      this.emo.classList.add("running");
+    } else {
+      this.emo.classList.remove("running");
+      if (this.arrive) { const cb = this.arrive; this.arrive = null; cb(); }
+    }
+    this.place();
+  },
+
+  beginKick(job) {
+    this.busy = true;
+    const stage = document.getElementById("stage");
+    const s = parseFloat(getComputedStyle(stage).getPropertyValue("--scale")) || 1;
+    const cr = job.cardEl.getBoundingClientRect();
+    const sr = stage.getBoundingClientRect();
+    const cx = (cr.left - sr.left) / s;
+    const cy = (cr.top - sr.top) / s;
+    const ch = cr.height / s;
+    this.tx = cx - 56;
+    this.ty = cy + ch - 54;
+    this.arrive = () => {
+      this.emo.classList.add("kicking");
+      job.cardEl.classList.add("kicked");
+      if (Chime.on) Chime.boing();
+      // little puff of dust where the kick lands
+      const puff = document.createElement("div");
+      puff.className = "puff";
+      puff.textContent = "💨";
+      puff.style.left = (cx + 20) + "px";
+      puff.style.top = (cy + ch / 2 - 20) + "px";
+      stage.appendChild(puff);
+      setTimeout(() => puff.remove(), 750);
+      setTimeout(() => this.emo.classList.remove("kicking"), 360);
+      setTimeout(() => {
+        job.done();
+        this.busy = false;
+        this.nextRoam = this.lastT + 4000;
+      }, 680);
+    };
+  },
 };
 
 /* -------------------------------------------------------------- feed/state */
@@ -254,9 +357,15 @@ function syncPanel(panel, list) {
   for (const [id, entry] of panel.items) {
     if (!incoming.has(id)) {
       const el = entry.el;
-      el.classList.add("leaving");
       panel.items.delete(id);
-      setTimeout(() => el.remove(), 520);
+      // A handled inquiry gets punted off by the pup; everything else fades.
+      if (panel.kind === "lead" && seededOnce && Dog.enabled) {
+        el.classList.add("awaiting-kick");
+        Dog.kick(el, () => { el.remove(); reorder(panel); layoutRows(panel); });
+      } else {
+        el.classList.add("leaving");
+        setTimeout(() => el.remove(), 520);
+      }
     }
   }
 
@@ -528,6 +637,7 @@ function fitStage() {
 async function main() {
   fitStage();
   window.addEventListener("resize", fitStage);
+  Dog.init();
   wireChimeToggle();
   updateClock();
   layoutRows(panels.leads);
