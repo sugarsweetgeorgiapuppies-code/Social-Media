@@ -191,6 +191,7 @@ const panels = {
 let lastOkMs = now();
 let hasLoaded = false;
 let seededOnce = false; // true after the first poll, so we don't ding on load
+let tomorrowCount = 0; // shown in the appointments empty state / header chip
 
 /* -------------------------------------------------------------- rendering */
 
@@ -381,37 +382,54 @@ function emptyState(kind) {
   const el = document.createElement("div");
   el.className = "empty";
   if (!hasLoaded) {
-    el.innerHTML = `<div class="em-ic">📡</div>
-      <div class="em-title" style="color:var(--ink-soft)">Connecting…</div>
-      <div class="em-sub">Waiting for the first update</div>`;
+    el.innerHTML = `<div class="em-ic">⏳</div>
+      <div class="em-title">Just a moment</div>
+      <div class="em-sub">Loading the latest…</div>`;
     return el;
   }
-  const copy = kind === "lead"
-    ? ["✅", "All caught up", "No leads awaiting a callback"]
-    : ["📅", "Nothing booked", "No more appointments today"];
-  el.innerHTML = `<div class="em-ic">${copy[0]}</div>
-    <div class="em-title">${copy[1]}</div>
-    <div class="em-sub">${copy[2]}</div>`;
+  let ic, title, sub;
+  if (kind === "lead") {
+    ic = "✓"; title = "All caught up";
+    sub = "No new inquiries need a call right now.";
+  } else {
+    ic = "📅"; title = "Nothing else today";
+    sub = tomorrowCount > 0
+      ? `Tomorrow has ${tomorrowCount} appointment${tomorrowCount === 1 ? "" : "s"} scheduled.`
+      : "No more appointments on the calendar today.";
+  }
+  el.innerHTML = `<div class="em-ic">${ic}</div>
+    <div class="em-title">${title}</div>
+    <div class="em-sub">${sub}</div>`;
   return el;
 }
 
 /* ------------------------------------------------------------- header/stats */
 
+/** Set a header counter value + a status dot (calm green → busy red). */
+function setCounter(id, chipId, value, bands) {
+  $(id).textContent = value;
+  const chip = $(chipId);
+  chip.classList.remove("good", "warn", "busy");
+  chip.classList.add(value >= bands[1] ? "busy" : value >= bands[0] ? "warn" : "good");
+}
+
 function updateHeaderCounts(data, apptsTodayCount) {
   const awaiting = (data.inquiries || []).length;
   const total = data.stats && Number.isFinite(data.stats.inquiriesToday)
     ? data.stats.inquiriesToday : awaiting;
-  $("#count-awaiting").textContent = awaiting;
-  $("#count-appts").textContent = apptsTodayCount;
-  $("#count-total").textContent = total;
+  // Only "Awaiting Call" escalates (calm → amber → red); the others stay calm.
+  setCounter("#count-awaiting", "#c-awaiting", awaiting, [1, 4]);
+  setCounter("#count-appts", "#c-appts", apptsTodayCount, [Infinity, Infinity]);
+  setCounter("#count-total", "#c-total", total, [Infinity, Infinity]);
   $("#panel-leads-count").textContent = awaiting;
   $("#panel-appts-count").textContent = apptsTodayCount;
 }
 
 function updateTomorrowChip(n) {
+  tomorrowCount = n;
   const chip = $("#appts-tomorrow");
   chip.hidden = n <= 0;
-  chip.textContent = `Tomorrow: ${n}`;
+  chip.innerHTML = `Tomorrow <b>${n}</b>`;
 }
 
 function updateClock() {
@@ -450,10 +468,10 @@ async function poll() {
     hasLoaded = true;
 
     const { today, tomorrow } = bucketAppointments(data.appointments);
+    updateTomorrowChip(tomorrow); // sets tomorrowCount before panels render their empty state
     syncPanel(panels.leads, data.inquiries);
     syncPanel(panels.appts, today);
     updateHeaderCounts(data, today.length);
-    updateTomorrowChip(tomorrow);
     updateStale();
     seededOnce = true; // subsequent new inquiries may ding
   } catch (err) {
@@ -491,11 +509,11 @@ function wireChimeToggle() {
     if (Chime.on) {
       Chime.disable();
       btn.setAttribute("aria-pressed", "false");
-      btn.querySelector(".chime-ic").textContent = "🔕";
+      btn.querySelector(".chime-ic").textContent = "🔇";
     } else {
       Chime.enable();
       btn.setAttribute("aria-pressed", "true");
-      btn.querySelector(".chime-ic").textContent = "🔔";
+      btn.querySelector(".chime-ic").textContent = "🔊";
       Chime.newInquiry(); // confirmation ding — also unlocks browser audio
     }
   });
