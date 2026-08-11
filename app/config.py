@@ -71,6 +71,10 @@ class Settings:
     BOARD_DEV_MODE = _bool("BOARD_DEV_MODE", not BOARD_FEED_URL)
     # Name shown in the board header.
     BOARD_STORE_NAME = os.getenv("BOARD_STORE_NAME", BUSINESS_NAME).strip()
+    # Optional access PIN. When set, the board page and its feed require the PIN
+    # (entered once per device; remembered in a cookie for a year). Leave blank
+    # to make the board open. Keep it out of git — set it in the host's env.
+    BOARD_PIN = os.getenv("BOARD_PIN", "").strip()
     # How often the browser re-polls the feed (seconds). 15 is a good live-but-
     # gentle value now that the feed is served directly (no n8n execution cost).
     # Going lower gives no visible benefit — the on-screen timers already tick

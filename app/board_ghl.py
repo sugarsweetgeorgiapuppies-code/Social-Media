@@ -31,6 +31,15 @@ _HEADERS = {"Version": "2021-07-28", "Accept": "application/json"}
 # Small in-process cache so rapid polls / multiple tabs don't multiply API calls.
 _cache: dict = {"at": 0.0, "data": None}
 
+# "Inquiries Today" must be a true daily total that only ever climbs from
+# midnight (store time) until midnight the next day. We can't recompute it
+# fresh each poll from a single search call: GoHighLevel returns opportunities
+# in recently-updated order capped at a page size, so a lead created earlier
+# today can slip out of that window and the count would drop, then reappear.
+# Instead we remember every lead id we've seen created today and count the set
+# — it grows as new leads arrive and resets when the date rolls over.
+_daily = {"date": None, "ids": set()}
+
 
 def _get(path: str, params: dict) -> dict:
     url = f"{_API}{path}?{urllib.parse.urlencode(params)}"
@@ -111,14 +120,21 @@ def build_feed() -> dict:
         tz = dt.timezone.utc
     today = dt.datetime.now(tz).date()
 
+    # Roll the daily counter over at midnight (store time), then only ever add.
+    if _daily["date"] != today:
+        _daily["date"] = today
+        _daily["ids"] = set()
+
     inquiries = []
-    inquiries_today = 0  # everyone who came in today, regardless of outcome
     for o in opp_resp.get("opportunities", []):
         if o.get("pipelineId") != gi.get("id"):
             continue
         created = _parse_dt(o.get("createdAt"))
-        if created and created.astimezone(tz).date() == today:
-            inquiries_today += 1
+        if created and created.astimezone(tz).date() == today and o.get("id"):
+            # Seen once today => counted for the rest of the day. Because this is
+            # a set of ids, it never double-counts and never decreases, even if a
+            # lead drops out of a later search window.
+            _daily["ids"].add(o.get("id"))
         # The board only lists leads still awaiting a call: open, pre-appointment.
         if "appointment" in stage_name.get(o.get("pipelineStageId"), ""):
             continue
@@ -172,7 +188,7 @@ def build_feed() -> dict:
         "floor": [],
         "generatedAt": dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
             .isoformat().replace("+00:00", "Z"),
-        "stats": {"inquiriesToday": inquiries_today},
+        "stats": {"inquiriesToday": len(_daily["ids"])},
     }
     _cache["at"] = now
     _cache["data"] = feed

@@ -12,12 +12,14 @@ to GoHighLevel.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import urllib.error
 import urllib.request
 
-from fastapi import APIRouter
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import APIRouter, Request
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from pydantic import BaseModel
 
 from .. import board_ghl
 from ..board_mock import generate_mock_feed
@@ -28,17 +30,66 @@ log = get_logger(__name__)
 
 router = APIRouter(prefix="/board", tags=["board"])
 
+# ---------------------------------------------------------------- access gate
+# When BOARD_PIN is set, the board page and its feed require the PIN. A device
+# enters it once; we drop a cookie holding a hash of the PIN (never the PIN
+# itself) so the wall TV stays logged in. Blank PIN => board is open to anyone.
+_COOKIE = "board_auth"
+
+
+def _pin_enabled() -> bool:
+    return bool(settings.BOARD_PIN)
+
+
+def _token() -> str:
+    """Opaque cookie value derived from the PIN (so the raw PIN isn't stored)."""
+    return hashlib.sha256(f"ssgp-board::{settings.BOARD_PIN}".encode()).hexdigest()
+
+
+def _authed(request: Request) -> bool:
+    return not _pin_enabled() or request.cookies.get(_COOKIE) == _token()
+
+
+class _PinIn(BaseModel):
+    pin: str = ""
+
 
 @router.get("", include_in_schema=False)
 @router.get("/", include_in_schema=False)
-def board_page():
-    """Serve the full-screen board."""
+def board_page(request: Request):
+    """Serve the full-screen board (or the PIN screen if not unlocked)."""
+    if not _authed(request):
+        return FileResponse(STATIC_DIR / "board_login.html")
     return FileResponse(STATIC_DIR / "board.html")
 
 
+@router.get("/login", include_in_schema=False)
+def board_login_page(request: Request):
+    """The PIN entry screen (redirect straight in if already unlocked)."""
+    if _authed(request):
+        return RedirectResponse(url="/board/", status_code=302)
+    return FileResponse(STATIC_DIR / "board_login.html")
+
+
+@router.post("/login", include_in_schema=False)
+def board_login_submit(body: _PinIn):
+    """Check the PIN; on success set the remember-me cookie."""
+    if _pin_enabled() and body.pin.strip() == settings.BOARD_PIN:
+        resp = JSONResponse({"ok": True})
+        resp.set_cookie(
+            _COOKIE, _token(),
+            max_age=60 * 60 * 24 * 365,  # remember this device for a year
+            httponly=True, samesite="lax",
+        )
+        return resp
+    return JSONResponse(status_code=401, content={"ok": False})
+
+
 @router.get("/config")
-def board_config():
+def board_config(request: Request):
     """Runtime config the browser needs (nothing secret here)."""
+    if not _authed(request):
+        return JSONResponse(status_code=401, content={"error": "unauthorized"})
     return {
         "storeName": settings.BOARD_STORE_NAME,
         "pollSeconds": settings.BOARD_POLL_SECONDS,
@@ -48,7 +99,7 @@ def board_config():
 
 
 @router.get("/feed")
-def board_feed():
+def board_feed(request: Request):
     """Return the current board data.
 
     Dev mode returns generated mock data. Otherwise the configured upstream
@@ -59,6 +110,9 @@ def board_feed():
 
     Priority: direct GoHighLevel (no n8n) > dev/mock > proxied BOARD_FEED_URL.
     """
+    if not _authed(request):
+        return JSONResponse(status_code=401, content={"error": "unauthorized"})
+
     # Direct GoHighLevel: this server fetches GHL itself, so n8n runs nothing.
     if settings.board_ghl_enabled:
         try:

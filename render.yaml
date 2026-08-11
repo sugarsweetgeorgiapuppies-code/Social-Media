@@ -19,3 +19,5 @@ services:
         value: "g8MCjvLjpPvyvu4k3WGG"
       - key: BOARD_GHL_TOKEN
         sync: false # set this in the Render dashboard (secret)
+      - key: BOARD_PIN
+        sync: false # access PIN for the wall display; set in Render dashboard
