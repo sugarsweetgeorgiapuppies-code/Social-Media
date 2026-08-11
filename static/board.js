@@ -147,6 +147,125 @@ function parseMs(iso) {
   return Number.isNaN(t) ? now() : t;
 }
 
+/* Respect the viewer's reduced-motion preference for all the flourishes. */
+let MOTION = true;
+try { MOTION = !matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (_) {}
+
+/* ------------------------------------------------------- celebration effects */
+
+/** Fling a little burst of paws/confetti outward from a stage point (x,y). */
+function celebrate(x, y, count = 14, big = false) {
+  if (!MOTION) return;
+  const stage = document.getElementById("stage");
+  const chars = big ? ["🐾", "🎉", "✨", "💛", "🐶", "⭐"] : ["🐾", "✨", "💛", "🐾"];
+  const n = big ? count + 10 : count;
+  for (let i = 0; i < n; i++) {
+    const p = document.createElement("div");
+    p.className = "confetti";
+    p.textContent = chars[Math.floor(Math.random() * chars.length)];
+    const ang = Math.random() * Math.PI * 2;
+    const dist = (big ? 130 : 70) + Math.random() * (big ? 170 : 90);
+    p.style.left = x + "px";
+    p.style.top = y + "px";
+    p.style.setProperty("--dx", Math.cos(ang) * dist + "px");
+    p.style.setProperty("--dy", (Math.sin(ang) * dist - 30) + "px");
+    p.style.setProperty("--rot", (Math.random() * 720 - 360) + "deg");
+    p.style.fontSize = (16 + Math.random() * (big ? 26 : 14)) + "px";
+    p.style.animationDelay = (Math.random() * 0.12) + "s";
+    stage.appendChild(p);
+    setTimeout(() => p.remove(), 1500);
+  }
+}
+
+/** Big center-screen "🎉 N inquiries today!" toast at a daily milestone. */
+function celebrateMilestone(n) {
+  celebrate(960, 470, 24, true);
+  Dog.cheer();
+  const b = document.createElement("div");
+  b.className = "cel-banner";
+  b.innerHTML = `🎉 <b>${n}</b> inquiries today!`;
+  document.getElementById("stage").appendChild(b);
+  requestAnimationFrame(() => b.classList.add("show"));
+  setTimeout(() => { b.classList.remove("show"); }, 3400);
+  setTimeout(() => b.remove(), 4000);
+}
+
+/* --------------------------------------------------------- seasonal ambience */
+/* A thin layer of drifting particles chosen by the calendar: snow in winter,
+   leaves in fall, blossoms in spring, sparkles in summer, plus a few holiday
+   surprises. Deliberately sparse so it never competes with the cards. */
+const Season = {
+  layer: null, timer: null, cfg: null,
+
+  pick() {
+    const d = new Date();
+    const m = d.getMonth(); // 0=Jan
+    const day = d.getDate();
+    // Holiday overrides first.
+    if (m === 1 && day >= 10 && day <= 15)   // Valentine's week
+      return { chars: ["💗", "💕", "🐾"], peak: 0.8 };
+    if (m === 9 && day >= 24)                 // Halloween stretch
+      return { chars: ["🎃", "🍂", "🦇"], peak: 0.75 };
+    if ((m === 11 && day >= 20) || (m === 11 && day <= 26)) // Christmas
+      return { chars: ["❄️", "🎄", "⭐"], peak: 0.85 };
+    if (m === 6 && day >= 1 && day <= 5)      // 4th of July
+      return { chars: ["✨", "⭐", "🎉"], peak: 0.8 };
+    // Seasons.
+    if (m === 11 || m === 0 || m === 1) return { chars: ["❄️", "❄", "🤍"], peak: 0.85 }; // winter
+    if (m >= 2 && m <= 4) return { chars: ["🌸", "🌼", "🌿"], peak: 0.7 };               // spring
+    if (m >= 5 && m <= 7) return { chars: ["✨", "🌿", "🐝"], peak: 0.55 };               // summer
+    return { chars: ["🍂", "🍁", "🌰"], peak: 0.8 };                                       // fall
+  },
+
+  init() {
+    if (!MOTION) return;
+    this.cfg = this.pick();
+    this.layer = document.createElement("div");
+    this.layer.className = "season";
+    this.layer.setAttribute("aria-hidden", "true");
+    const stage = document.getElementById("stage");
+    // Insert just after the background orbs so it sits behind the cards.
+    const orbs = stage.querySelector(".bg-orbs");
+    stage.insertBefore(this.layer, orbs ? orbs.nextSibling : stage.firstChild);
+    // A gentle, steady sprinkle.
+    this.timer = setInterval(() => this.spawn(), 1300);
+    for (let i = 0; i < 4; i++) setTimeout(() => this.spawn(), i * 400);
+  },
+
+  spawn() {
+    if (!this.layer || this.layer.childElementCount > 16) return;
+    const f = document.createElement("div");
+    f.className = "flake";
+    f.textContent = this.cfg.chars[Math.floor(Math.random() * this.cfg.chars.length)];
+    const dur = 10 + Math.random() * 7;
+    f.style.left = Math.random() * 1920 + "px";
+    f.style.fontSize = (16 + Math.random() * 20) + "px";
+    f.style.setProperty("--peak", (this.cfg.peak * (0.6 + Math.random() * 0.4)).toFixed(2));
+    f.style.setProperty("--sway", (Math.random() * 120 - 60) + "px");
+    f.style.setProperty("--spin", (Math.random() * 260 - 130) + "deg");
+    f.style.animationDuration = dur + "s";
+    this.layer.appendChild(f);
+    setTimeout(() => f.remove(), dur * 1000 + 200);
+  },
+};
+
+/* ----------------------------------------------------- screen burn-in guard */
+/* Nudge the whole canvas a few pixels every 90s. Invisible to the eye but it
+   keeps the static header/panels from ghosting into an always-on TV panel. */
+function antiBurnIn() {
+  const offs = [[0, 0], [5, 3], [7, -3], [3, 6], [-4, 4], [-6, -3], [-3, -6], [4, -5]];
+  let i = 0;
+  const stage = document.getElementById("stage");
+  // Enable the smooth drift only now (after the initial fit) so the board
+  // never animates its scale into place on load.
+  stage.style.transition = "transform 3s ease";
+  setInterval(() => {
+    i = (i + 1) % offs.length;
+    stage.style.setProperty("--sx", offs[i][0] + "px");
+    stage.style.setProperty("--sy", offs[i][1] + "px");
+  }, 90000);
+}
+
 /* ------------------------------------------------------------------- chime */
 const Chime = {
   on: false, ctx: null,
@@ -273,6 +392,7 @@ const Dog = {
   homeX: 1711, homeY: 986, // nestled inside the dog house (bottom-right floor)
   x: 1711, y: 986, tx: 1711, ty: 986, facing: 1,
   speed: 1200, busy: false, queue: [], arrive: null, lastT: 0, nextRoam: 0,
+  _lastConcern: 0, // throttles the "trot over to a red card" reaction
 
   // Idle tricks the pup performs at random. Each is a CSS class + duration.
   TRICKS: [
@@ -307,10 +427,29 @@ const Dog = {
 
   place() { this.el.style.transform = `translate(${this.x}px, ${this.y}px)`; },
 
-  /** Queue a card to be punted; `done` removes it once the pup connects. */
-  kick(cardEl, done) {
+  /** Queue a card to be punted; `done` removes it once the pup connects.
+      `meta.fast` (answered before it turned orange) => a bigger celebration. */
+  kick(cardEl, done, meta = {}) {
     if (!this.enabled) { done(); return; }
-    this.queue.push({ cardEl, done });
+    this.queue.push({ type: "kick", cardEl, done, fast: !!meta.fast });
+  },
+
+  /** Trot over and look concerned at a card that just turned red. Throttled,
+      and never interrupts a punt in progress. */
+  concern(cardEl) {
+    if (!this.enabled || this.busy || this.queue.length || this.arrive) return;
+    if (this.lastT - this._lastConcern < 25000) return;
+    this._lastConcern = this.lastT;
+    this.queue.push({ type: "concern", cardEl });
+  },
+
+  /** A quick happy double-hop (used on fast answers + milestones). */
+  cheer() {
+    if (!this.emo) return;
+    this.emo.classList.remove("t-hop");
+    void this.emo.offsetWidth; // restart the animation
+    this.emo.classList.add("t-hop");
+    setTimeout(() => this.emo.classList.remove("t-hop"), 640);
   },
 
   step(t) {
@@ -322,7 +461,9 @@ const Dog = {
     if (dist <= 2 && !this.arrive && !this.busy) {
       if (this.queue.length) {
         this.wake();
-        this.beginKick(this.queue.shift());
+        const job = this.queue.shift();
+        if (job.type === "concern") this.beginConcern(job);
+        else this.beginKick(job);
       } else if (!this.sleeping && t > this.nextRoam) {
         this.tx = this.homeX; this.ty = this.homeY;
         const waiting = document.querySelectorAll(
@@ -378,6 +519,9 @@ const Dog = {
       stage.appendChild(puff);
       setTimeout(() => puff.remove(), 750);
       setTimeout(() => this.emo.classList.remove("kicking"), 360);
+      // A handled lead is a win — celebrate (bigger if answered quickly).
+      celebrate(cx + 30, cy + ch / 2, job.fast ? 16 : 8, job.fast);
+      if (job.fast) setTimeout(() => this.cheer(), 360);
       setTimeout(() => {
         job.done();
         this.busy = false;
@@ -385,6 +529,44 @@ const Dog = {
         this.nextRoam = this.lastT + 4000;
       }, 680);
     };
+  },
+
+  /** Trot beside a red card, perk up with a "!" bubble, then head home. */
+  beginConcern(job) {
+    if (!document.contains(job.cardEl)) { this.busy = false; return; }
+    this.busy = true;
+    const stage = document.getElementById("stage");
+    const s = parseFloat(getComputedStyle(stage).getPropertyValue("--scale")) || 1;
+    const cr = job.cardEl.getBoundingClientRect();
+    const sr = stage.getBoundingClientRect();
+    const cx = (cr.left - sr.left) / s;
+    const cy = (cr.top - sr.top) / s;
+    const ch = cr.height / s;
+    this.tx = cx - this.W * 0.82;
+    this.ty = cy + ch - this.H * 0.92;
+    this.arrive = () => {
+      this.facing = 1;
+      this.face.style.transform = "scaleX(1)"; // face the card
+      this.alertBubble(this.x + 46, this.y - 18);
+      this.emo.classList.add("perk");
+      setTimeout(() => this.emo.classList.remove("perk"), 1500);
+      setTimeout(() => {
+        this.busy = false;
+        this.tx = this.homeX; this.ty = this.homeY;
+        this.nextRoam = this.lastT + 4000;
+      }, 1600);
+    };
+  },
+
+  /** A red "!" bubble above the pup. */
+  alertBubble(x, y) {
+    const b = document.createElement("div");
+    b.className = "alertbub";
+    b.textContent = "!";
+    b.style.left = x + "px";
+    b.style.top = y + "px";
+    document.getElementById("stage").appendChild(b);
+    setTimeout(() => b.remove(), 1500);
   },
 
   /** Convert an element's rect into stage-space coordinates. */
@@ -571,8 +753,10 @@ function syncPanel(panel, list) {
       panel.items.delete(id);
       // A handled inquiry gets punted off by the pup; everything else fades.
       if (panel.kind === "lead" && seededOnce && Dog.enabled) {
+        // "Fast" = answered before it turned orange (still green/yellow).
+        const fast = !entry.level || entry.level === "green" || entry.level === "yellow";
         el.classList.add("awaiting-kick");
-        Dog.kick(el, () => { el.remove(); reorder(panel); layoutRows(panel); });
+        Dog.kick(el, () => { el.remove(); reorder(panel); layoutRows(panel); }, { fast });
       } else {
         el.classList.add("leaving");
         setTimeout(() => el.remove(), 520);
@@ -672,7 +856,11 @@ function applyLevel(entry, level) {
   entry.el.classList.remove(...ALL_LEVEL_CLASSES);
   entry.el.classList.add("lvl-" + level);
   entry.level = level;
-  if (level === "red" && prev && prev !== "red") Chime.play();
+  if (level === "red" && prev && prev !== "red") {
+    Chime.play();
+    // Pup notices a lead that's now waiting too long and trots over to nudge.
+    if (entry.el.closest("#leads")) Dog.concern(entry.el);
+  }
 }
 
 function updatePanelTimers(panel) {
@@ -728,6 +916,21 @@ function emptyState(kind) {
 
 /* ------------------------------------------------------------- header/stats */
 
+/* Daily-total milestones worth a little party. milestoneMark tracks the
+   highest one already reached; it's seeded on the first poll (so we never
+   celebrate a number the board simply loaded into). */
+const MILESTONES = [10, 25, 50, 75, 100, 150, 200, 300];
+let milestoneMark = -1;
+
+function checkMilestone(total) {
+  const reached = MILESTONES.filter((m) => total >= m).length - 1;
+  if (milestoneMark < 0) { milestoneMark = reached; return; } // seed, no party
+  if (reached > milestoneMark) {
+    milestoneMark = reached;
+    celebrateMilestone(MILESTONES[reached]);
+  }
+}
+
 /** Set a header counter value + a status dot (calm green → busy red). */
 function setCounter(id, chipId, value, bands) {
   $(id).textContent = value;
@@ -746,6 +949,7 @@ function updateHeaderCounts(data, apptsTodayCount) {
   setCounter("#count-total", "#c-total", total, [Infinity, Infinity]);
   $("#panel-leads-count").textContent = awaiting;
   $("#panel-appts-count").textContent = apptsTodayCount;
+  checkMilestone(total);
 }
 
 function updateTomorrowChip(n) {
@@ -851,6 +1055,8 @@ function fitStage() {
 async function main() {
   fitStage();
   window.addEventListener("resize", fitStage);
+  Season.init();
+  antiBurnIn();
   Dog.init();
   wireChimeToggle();
   updateClock();
