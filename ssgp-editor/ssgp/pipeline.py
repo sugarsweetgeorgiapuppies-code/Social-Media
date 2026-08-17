@@ -234,16 +234,34 @@ def render_video(
     # Colour: iPhone HDR (HLG/bt2020) footage MUST be converted to standard SDR
     # to look right in a normal MP4 — leaving it raw is what looks washed/filtered.
     # Do it with a PROPER tone-mapper (on by default); SDR footage is untouched.
-    do_color = out.get("color_fix", True)
+    do_color = out.get("color_fix", False)  # default: keep the clip's ORIGINAL colour
     color_prefix = hdr_to_sdr_prefilter(info) if do_color else ""
     applied["hdr_source"] = info.is_hdr
     applied["hdr_tonemapped"] = bool(color_prefix)
     applied["hdr_quality"] = hdr_quality(info)
     if info.is_hdr and do_color and not color_prefix:
         applied["hdr_note"] = "HDR clip, but this FFmpeg has no tone-mapper (zscale/libplacebo)."
-    # If we tone-mapped -> tag BT.709 SDR. Otherwise mirror the source tags so an
-    # already-SDR clip is byte-faithful.
+    # If we tone-mapped -> tag BT.709 SDR. Otherwise mirror the source tags so the
+    # output keeps the EXACT same colour as the input.
     cfg["_color_tags"] = color_tags(info, bool(color_prefix))
+    # Preserve bit depth + codec so a 10-bit HDR source we didn't tone-map keeps
+    # its EXACT colour (not crushed to 8-bit, which is what washed it out). HDR
+    # 10-bit is kept as HEVC (hvc1) — how the iPhone shot it — so it plays the
+    # same everywhere Apple footage does.
+    preserve_hdr = (not color_prefix) and info.is_10bit and info.is_hdr
+    if preserve_hdr:
+        cfg["_pix_fmt"] = "yuv420p10le"
+        cfg["_vcodec"] = "libx265"
+        cfg["_vtag"] = ["-tag:v", "hvc1"]
+        applied["color_preserved"] = "HDR 10-bit kept as-is"
+    elif not color_prefix and info.is_10bit:
+        cfg["_pix_fmt"] = "yuv420p10le"
+        cfg["_vcodec"] = out.get("video_codec", "libx264")
+        cfg["_vtag"] = []
+    else:
+        cfg["_pix_fmt"] = out.get("pixel_format", "yuv420p")
+        cfg["_vcodec"] = out.get("video_codec", "libx264")
+        cfg["_vtag"] = []
     _video_pass(source_path, styled_full, cfg, W, H, FPS, src_duration,
                 [(0.0, src_duration)], caption_list, fonts_dir, work, log_path, color_prefix,
                 graphics_list)
@@ -425,9 +443,9 @@ def _apply_cuts_av(video_src: str, audio_src: str, dst: str, keeps: Sequence[Seg
 
     cmd = [
         "ffmpeg", "-y", *inputs, "-filter_complex", fc, *maps,
-        "-c:v", o.get("video_codec", "libx264"), "-crf", str(o.get("crf", 20)),
-        "-preset", o.get("preset", "medium"), "-pix_fmt", o.get("pixel_format", "yuv420p"),
-        *cfg.get("_color_tags", SDR_TAGS), "-r", str(fps),
+        "-c:v", cfg.get("_vcodec", "libx264"), "-crf", str(o.get("crf", 20)),
+        "-preset", o.get("preset", "medium"), "-pix_fmt", cfg.get("_pix_fmt", "yuv420p"),
+        *cfg.get("_color_tags", SDR_TAGS), *cfg.get("_vtag", []), "-r", str(fps),
     ]
     if has_audio:
         cmd += ["-c:a", "aac", "-b:a", o.get("audio_bitrate", "192k")]
@@ -523,9 +541,9 @@ def _video_pass(src, dst, cfg, W, H, FPS, duration, keeps, caption_list, fonts_d
     o = cfg["output"]
     run([
         "ffmpeg", "-y", *inputs, "-filter_complex", fc, "-map", f"[{last}]", "-an",
-        "-c:v", o.get("video_codec", "libx264"), "-crf", str(o.get("crf", 20)),
-        "-preset", o.get("preset", "medium"), "-pix_fmt", o.get("pixel_format", "yuv420p"),
-        *cfg.get("_color_tags", SDR_TAGS), "-r", str(FPS), "-t", f"{duration:.3f}", dst,
+        "-c:v", cfg.get("_vcodec", "libx264"), "-crf", str(o.get("crf", 20)),
+        "-preset", o.get("preset", "medium"), "-pix_fmt", cfg.get("_pix_fmt", "yuv420p"),
+        *cfg.get("_color_tags", SDR_TAGS), *cfg.get("_vtag", []), "-r", str(FPS), "-t", f"{duration:.3f}", dst,
     ], log_path)
 
 
@@ -650,9 +668,9 @@ def _build_cta_card(dst, cfg, W, H, FPS, fonts_dir, work, log_path):
         "-loop", "1", "-t", f"{dur}", "-i", str(card_png),
         "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
         "-t", f"{dur}",
-        "-c:v", o.get("video_codec", "libx264"), "-crf", str(o.get("crf", 20)),
-        "-preset", o.get("preset", "medium"), "-pix_fmt", o.get("pixel_format", "yuv420p"),
-        *cfg.get("_color_tags", SDR_TAGS), "-c:a", "aac", "-b:a", "128k", "-r", str(FPS), dst,
+        "-c:v", cfg.get("_vcodec", "libx264"), "-crf", str(o.get("crf", 20)),
+        "-preset", o.get("preset", "medium"), "-pix_fmt", cfg.get("_pix_fmt", "yuv420p"),
+        *cfg.get("_color_tags", SDR_TAGS), *cfg.get("_vtag", []), "-c:a", "aac", "-b:a", "128k", "-r", str(FPS), dst,
     ], log_path)
 
 
@@ -664,16 +682,17 @@ def _concat_finalise(parts: Sequence[str], out_path: str, cfg, log_path):
         inputs += ["-i", p]
     n = len(parts)
     # normalise SAR/format on every input so concat's strict matching passes
-    pre = "".join(f"[{i}:v:0]setsar=1,format=yuv420p[v{i}];" for i in range(n))
+    _pf = cfg.get("_pix_fmt", "yuv420p")
+    pre = "".join(f"[{i}:v:0]setsar=1,format={_pf}[v{i}];" for i in range(n))
     streams = "".join(f"[v{i}][{i}:a:0]" for i in range(n))
     fc = f"{pre}{streams}concat=n={n}:v=1:a=1[v][a]"
     movflags = ["-movflags", "+faststart"] if o.get("faststart", True) else []
     run([
         "ffmpeg", "-y", *inputs, "-filter_complex", fc,
         "-map", "[v]", "-map", "[a]",
-        "-c:v", o.get("video_codec", "libx264"), "-crf", str(o.get("crf", 20)),
-        "-preset", o.get("preset", "medium"), "-pix_fmt", o.get("pixel_format", "yuv420p"),
-        *cfg.get("_color_tags", SDR_TAGS), "-c:a", "aac", "-b:a", o.get("audio_bitrate", "192k"), *movflags, out_path,
+        "-c:v", cfg.get("_vcodec", "libx264"), "-crf", str(o.get("crf", 20)),
+        "-preset", o.get("preset", "medium"), "-pix_fmt", cfg.get("_pix_fmt", "yuv420p"),
+        *cfg.get("_color_tags", SDR_TAGS), *cfg.get("_vtag", []), "-c:a", "aac", "-b:a", o.get("audio_bitrate", "192k"), *movflags, out_path,
     ], log_path)
 
 
@@ -684,9 +703,9 @@ def _apply_speed(src: str, dst: str, sf: float, cfg, FPS: int, log_path):
     fc = f"[0:v]setpts=PTS/{sf:.5f}[v];[0:a]atempo={sf:.5f}[a]"
     run([
         "ffmpeg", "-y", "-i", src, "-filter_complex", fc, "-map", "[v]", "-map", "[a]",
-        "-c:v", o.get("video_codec", "libx264"), "-crf", str(o.get("crf", 20)),
-        "-preset", o.get("preset", "medium"), "-pix_fmt", o.get("pixel_format", "yuv420p"),
-        *cfg.get("_color_tags", SDR_TAGS), "-c:a", "aac", "-b:a", o.get("audio_bitrate", "192k"), "-r", str(FPS), dst,
+        "-c:v", cfg.get("_vcodec", "libx264"), "-crf", str(o.get("crf", 20)),
+        "-preset", o.get("preset", "medium"), "-pix_fmt", cfg.get("_pix_fmt", "yuv420p"),
+        *cfg.get("_color_tags", SDR_TAGS), *cfg.get("_vtag", []), "-c:a", "aac", "-b:a", o.get("audio_bitrate", "192k"), "-r", str(FPS), dst,
     ], log_path)
 
 

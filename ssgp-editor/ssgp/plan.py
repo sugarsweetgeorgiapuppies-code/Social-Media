@@ -275,8 +275,10 @@ def summarize(applied: dict, cfg: dict) -> List[str]:
     music = applied.get("music")
     if music:
         out.append(f"Laid in background music ({music}), ducked under the voice.")
-    if applied.get("hdr_tonemapped"):
-        out.append("Corrected HDR color to standard range.")
+    if applied.get("color_preserved"):
+        out.append("Kept the original color exactly (same as your upload).")
+    elif applied.get("hdr_tonemapped"):
+        out.append("Converted HDR color to standard range.")
     if applied.get("cta"):
         out.append("Added an end card with the business name and phone number.")
     return out

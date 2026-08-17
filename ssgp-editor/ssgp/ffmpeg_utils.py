@@ -55,6 +55,13 @@ class ProbeInfo:
     color_space: str = ""
     color_transfer: str = ""
     color_primaries: str = ""
+    pix_fmt: str = ""
+    color_range: str = ""
+
+    @property
+    def is_10bit(self) -> bool:
+        p = (self.pix_fmt or "").lower()
+        return "p10" in p or "10le" in p or "10be" in p or "p12" in p or "12le" in p
 
     @property
     def is_hdr(self) -> bool:
@@ -147,7 +154,7 @@ def color_tags(info: "ProbeInfo", tonemapped: bool) -> list:
     if info.color_transfer:
         tags += ["-color_trc", info.color_transfer]
     if tags:
-        tags += ["-color_range", "tv"]
+        tags += ["-color_range", info.color_range or "tv"]
         return tags
     return list(SDR_TAGS)
 
@@ -197,6 +204,8 @@ def probe(path: str) -> ProbeInfo:
         color_space=v.get("color_space", "") or "",
         color_transfer=v.get("color_transfer", "") or "",
         color_primaries=v.get("color_primaries", "") or "",
+        pix_fmt=v.get("pix_fmt", "") or "",
+        color_range=v.get("color_range", "") or "",
     )
 
 
