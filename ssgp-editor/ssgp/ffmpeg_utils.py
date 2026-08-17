@@ -107,25 +107,22 @@ def hdr_quality(info: "ProbeInfo") -> str:
 
 
 def hdr_to_sdr_prefilter(info: "ProbeInfo") -> str:
-    """A filter-chain prefix (ending with a comma) that converts HDR footage to
-    SDR BT.709 using the best filter this ffmpeg has. Empty string for SDR."""
+    """A filter-chain prefix (ending with a comma) that converts HDR (HLG/PQ,
+    bt2020) footage to natural SDR BT.709, using a PROPER tone-mapper only.
+
+    Empty string when the clip is already SDR, or when this ffmpeg has no real
+    tone-mapper (in which case we'd rather leave the colour untouched than apply
+    the old approximate 'eq' hack, which looked grey/filtered)."""
     if not info.is_hdr:
         return ""
     if has_filter("zscale") and has_filter("tonemap"):
-        # proper HDR->SDR tone-map (needs libzimg)
+        # proper HDR->SDR tone-map (needs libzimg). desat=0 keeps colour vivid.
         return ("zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,"
                 "tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p,")
     if has_filter("libplacebo"):
         return "libplacebo=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv,format=yuv420p,"
-    # No proper tone-mapper (lean ffmpeg): do the bt2020->bt709 matrix conversion
-    # and counteract the flat, washed-out "grey" look that HLG/PQ footage takes on
-    # when it isn't tone-mapped — its blacks are lifted, contrast is low and colour
-    # is dull. We darken slightly, add contrast and restore saturation so it reads
-    # like normal SDR video. Approximate, but never errors. For picture-perfect
-    # colour, install an ffmpeg that has zscale (see README).
-    return ("scale=in_color_matrix=bt2020:out_color_matrix=bt709,"
-            "eq=contrast=1.16:saturation=1.32:gamma=0.94:brightness=-0.02,"
-            "format=yuv420p,")
+    # No real tone-mapper available: do NOT apply the old approximate filter.
+    return ""
 
 
 # SDR BT.709 output tags — used when we've actually tone-mapped to SDR

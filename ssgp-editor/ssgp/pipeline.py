@@ -231,13 +231,18 @@ def render_video(
     # ---- 5) style the FULL clip: reframe + zoom + captions + watermark -----
     progress(48, "video")
     styled_full = str(work / "styled_full.mp4")
-    # Colour: OFF by default so the render keeps the clip's original colour (no
-    # "filter"). Only tone-map HDR->SDR when explicitly asked (output.color_fix).
-    color_prefix = hdr_to_sdr_prefilter(info) if out.get("color_fix", False) else ""
+    # Colour: iPhone HDR (HLG/bt2020) footage MUST be converted to standard SDR
+    # to look right in a normal MP4 — leaving it raw is what looks washed/filtered.
+    # Do it with a PROPER tone-mapper (on by default); SDR footage is untouched.
+    do_color = out.get("color_fix", True)
+    color_prefix = hdr_to_sdr_prefilter(info) if do_color else ""
+    applied["hdr_source"] = info.is_hdr
     applied["hdr_tonemapped"] = bool(color_prefix)
-    applied["hdr_quality"] = hdr_quality(info) if out.get("color_fix", False) else ""
-    # When we didn't tone-map, mirror the source's colour tags so the output
-    # looks identical to the original instead of a forced BT.709 conversion.
+    applied["hdr_quality"] = hdr_quality(info)
+    if info.is_hdr and do_color and not color_prefix:
+        applied["hdr_note"] = "HDR clip, but this FFmpeg has no tone-mapper (zscale/libplacebo)."
+    # If we tone-mapped -> tag BT.709 SDR. Otherwise mirror the source tags so an
+    # already-SDR clip is byte-faithful.
     cfg["_color_tags"] = color_tags(info, bool(color_prefix))
     _video_pass(source_path, styled_full, cfg, W, H, FPS, src_duration,
                 [(0.0, src_duration)], caption_list, fonts_dir, work, log_path, color_prefix,

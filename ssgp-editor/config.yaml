@@ -21,8 +21,9 @@ output:
   reframe: cover_center
   crop_x: 0.5          # focus point for cover_at (0=left, 1=right)
   crop_y: 0.5          # focus point for cover_at (0=top, 1=bottom)
-  color_fix: false     # OFF = keep the clip's original colour (no filter). ON = tone-map HDR
-                       # footage to SDR. Only turn on if the video looks washed-out/grey.
+  color_fix: true      # convert iPhone HDR (HLG/bt2020) footage to natural standard colour
+                       # so it looks right everywhere. SDR footage is left untouched. Uses a
+                       # proper tone-mapper only (no ugly approximation). Set false to keep raw HDR.
   video_codec: libx264 # H.264
   pixel_format: yuv420p # max compatibility (fixes iPhone HEVC issue)
   crf: 20              # quality: lower = better/bigger (18-23 is a good range)
