@@ -129,12 +129,18 @@ def offline_trends(count: int = 4) -> dict:
     return {"source": "inferred", "notes": INFERRED_NOTE, "trends": trends}
 
 
+# Puppy-first rotation: lead with puppy_focus, never talking_head (the offline
+# evergreen formats are all puppy-driven), so the offline slate models the same
+# balanced content mix the live strategist is instructed to produce.
+_FORMAT_ROTATION = ["puppy_focus", "puppy_focus", "text_only", "voiceover", "puppy_focus"]
+
+
 def offline_ideas(trends: list[dict], series: list[dict]) -> dict:
     """Turn inferred trends + recurring series into idea skeletons."""
     ideas = []
     breeds = ["Maltipoo", "Yorkie", "Pomeranian", "Cavapoo", "Shih Tzu", "Bichon"]
 
-    for t in trends:
+    for idx, t in enumerate(trends):
         ideas.append(
             {
                 "title": t["adaptation"][:80],
@@ -142,6 +148,7 @@ def offline_ideas(trends: list[dict], series: list[dict]) -> dict:
                 if t["business_objective"] in {"shares", "reach", "comments"}
                 else "Conversion",
                 "content_type": "current_trend",
+                "format": _FORMAT_ROTATION[idx % len(_FORMAT_ROTATION)],
                 "breed": random.choice(breeds),
                 "platform": t.get("best_platform", "Instagram"),
                 "series_name": "",
@@ -165,6 +172,7 @@ def offline_ideas(trends: list[dict], series: list[dict]) -> dict:
                 "title": f"{s['name']}: today's pick",
                 "category": "Viral Entertainment",
                 "content_type": "recurring_series",
+                "format": "puppy_focus",
                 "breed": random.choice(breeds),
                 "platform": "Instagram",
                 "series_name": s["name"],
@@ -199,15 +207,43 @@ def offline_filming_package(idea: dict) -> dict:
     breed = idea.get("breed") or "puppy"
     hook = idea.get("hook_idea") or "Watch what this puppy does next."
     concept = idea.get("concept", "")
+    fmt = (idea.get("format") or "puppy_focus").strip().lower()
+
+    if fmt == "talking_head":
+        script = f"{hook} {concept} Come meet this one in person at the showroom."
+        filming = (
+            "1) Open on the puppy, then bring a person into frame talking to camera. "
+            "2) Keep the puppy on screen the whole time. 3) End on the puppy's face. "
+            "Hold the phone steady, film in good light, keep the puppy calm."
+        )
+    elif fmt == "voiceover":
+        script = f"(Voiceover, person off-camera) {hook} {concept}"
+        filming = (
+            "1) Open on a close-up of the puppy. 2) Record the lines as an "
+            "off-camera voiceover over the puppy footage. 3) End on the puppy's "
+            "face. Keep the puppy on screen throughout; film in good light."
+        )
+    elif fmt == "text_only":
+        script = "(No talking — on-screen text only.)"
+        filming = (
+            "1) Open on a close-up of the puppy. 2) Let the on-screen text carry the "
+            "hook and the action — no talking. 3) End on the puppy's face. Steady "
+            "phone, good light, gentle music."
+        )
+    else:  # puppy_focus (default) and skit both lead puppy-first with on-screen text
+        script = f"{hook} {concept} Come meet this one in person at the showroom."
+        filming = (
+            "1) Open on a close-up of the puppy. 2) Cut to the action described in "
+            "the concept in one clean take, with on-screen text carrying the story. "
+            "3) End on the puppy's face. Hold the phone steady, film in good light, "
+            "keep the puppy calm and comfortable."
+        )
+
     return {
         "first_second_visual": f"Tight close-up on the {breed} looking right into the camera.",
         "spoken_hook": hook,
-        "script": f"{hook} {concept} Come meet this one in person at the showroom.",
-        "filming_instructions": (
-            "1) Open on a close-up of the puppy. 2) Cut to the action described in "
-            "the concept in one clean take. 3) End on the puppy's face. Hold the "
-            "phone steady, film in good light, keep the puppy calm and comfortable."
-        ),
+        "script": script,
+        "filming_instructions": filming,
         "on_screen_text": f"{breed} • Lawrenceville, GA",
         "suggested_length": "20 seconds",
         "editing_instructions": (

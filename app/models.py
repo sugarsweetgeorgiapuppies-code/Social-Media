@@ -65,6 +65,19 @@ CONTENT_CATEGORIES = [
     "Conversion",
 ]
 
+# --- Video presentation formats (balance the mix; cap talking-head) ---
+# puppy_focus is the default and should dominate the slate: a puppy on screen
+# first with on-screen text carrying the story, rather than a person talking.
+CONTENT_FORMATS = [
+    "puppy_focus",   # puppies on screen + on-screen text, no one talking to camera
+    "voiceover",     # puppy footage with an off-camera human voiceover
+    "talking_head",  # a person talking to the camera or to the dogs (use sparingly)
+    "skit",          # a short staged scene with people and puppies
+    "text_only",     # on-screen text over silent footage
+]
+
+DEFAULT_FORMAT = "puppy_focus"
+
 
 class Trend(Base):
     __tablename__ = "trends"
@@ -107,6 +120,7 @@ class Idea(Base):
     title: Mapped[str] = mapped_column(String(300))
     category: Mapped[str] = mapped_column(String(60), default="Viral Entertainment", index=True)
     content_type: Mapped[str] = mapped_column(String(40), default="evergreen", index=True)
+    format: Mapped[str] = mapped_column(String(40), default="puppy_focus")
     breed: Mapped[str] = mapped_column(String(80), default="")
     platform: Mapped[str] = mapped_column(String(60), default="Instagram")
     trend_source: Mapped[str] = mapped_column(String(300), default="")

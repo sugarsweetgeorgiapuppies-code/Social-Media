@@ -1,7 +1,9 @@
-# Render deploy config for the Lead & Appointment Board.
-# You can either use this as a Blueprint, or just mirror these settings when
-# creating a Web Service manually. The GoHighLevel token is NOT in here — set it
-# in the Render dashboard (Environment tab) so the secret stays out of git.
+# Render deploy config for social-media-divp.
+# This one service now serves BOTH:
+#   /       -> the Sugar Sweet social-media app (Phil's filming hub: Today / This Week)
+#   /board  -> the store wall-display Board (PIN-protected)
+# Secrets (GoHighLevel token, board PIN, Anthropic key) are NOT in here — set them
+# in the Render dashboard (Environment tab) so they stay out of git.
 services:
   - type: web
     name: ssgp-board
@@ -11,8 +13,14 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: python run.py
     envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false # set in the Render dashboard — enables live research for the social app
       - key: DAILY_RUN_ENABLED
-        value: "false" # board only — skip the social-media scheduler
+        value: "true" # run the daily social-media research/briefing so "Today" is ready each morning
+      - key: DAILY_RUN_TIME
+        value: "07:00"
+      - key: TIMEZONE
+        value: America/New_York
       - key: BOARD_GHL_LOCATION_ID
         value: "7OAoy2QT49JimX9IsVnf"
       - key: BOARD_GHL_CALENDAR_ID

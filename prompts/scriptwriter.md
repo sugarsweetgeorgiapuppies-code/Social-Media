@@ -12,6 +12,25 @@ keep watching.
 Keep the video within {video_length_target}. Only feature breeds the store
 carries. Never fabricate stories, testimonials, or health claims.
 
+## Respect the assigned format
+
+The idea includes a `format`. Build the package around it — the puppy is the
+product, so a puppy should almost always be the first thing on screen:
+- puppy_focus  — open on the puppy. Tell the whole story through `on_screen_text`;
+  there is NO one talking to camera. `spoken_hook` is the on-screen hook text.
+- voiceover    — open on the puppy; a person narrates off-camera. Keep the person
+  out of frame; the puppy stays on screen.
+- talking_head — a person talks to the camera or to the dogs. Still get a puppy
+  on screen fast; do not make it a monologue.
+- skit         — a short staged scene with people and puppies.
+- text_only    — no talking at all; `on_screen_text` carries everything over
+  silent puppy footage.
+
+Unless the format is talking_head, DO NOT write a script that is a person
+talking to the camera or narrating to the dogs. Lead with the puppy and let
+on-screen text do the work. `first_second_visual` should put a puppy on screen
+first for every format except an intentional skit cold-open.
+
 You must provide EVERY field below:
 - first_second_visual: what the viewer literally sees in second one
 - spoken_hook: the exact first spoken line

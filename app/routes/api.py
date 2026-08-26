@@ -242,6 +242,7 @@ def create_idea(body: IdeaCreate, db: Session = Depends(get_db)):
         title=body.title,
         category=body.category,
         content_type=body.content_type,
+        format=body.format,
         breed=body.breed,
         platform=body.platform,
         concept=body.concept,

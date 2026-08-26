@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..ai import agents
 from ..logging_config import get_logger
-from ..models import Idea, Series, Trend
+from ..models import CONTENT_FORMATS, DEFAULT_FORMAT, Idea, Series, Trend
 from ..seed import brand_rules_dict
 from . import dedup
 
@@ -60,11 +60,15 @@ def create_ideas_from_strategy(
         virality = int(raw.get("virality_score", 5) or 5)
         conversion = int(raw.get("conversion_value", 5) or 5)
         difficulty = raw.get("difficulty", "Medium")
+        fmt = (raw.get("format") or "").strip().lower()
+        if fmt not in CONTENT_FORMATS:
+            fmt = DEFAULT_FORMAT
 
         idea = Idea(
             title=title,
             category=category,
             content_type=raw.get("content_type", "evergreen"),
+            format=fmt,
             breed=breed,
             platform=raw.get("platform", "Instagram"),
             trend_source=raw.get("trend_name", ""),
@@ -99,6 +103,7 @@ def build_filming_package(db: Session, idea: Idea) -> dict:
         "title": idea.title,
         "category": idea.category,
         "content_type": idea.content_type,
+        "format": idea.format,
         "breed": idea.breed,
         "platform": idea.platform,
         "concept": idea.concept,
@@ -150,6 +155,7 @@ def regenerate_variant(db: Session, idea: Idea, instruction: str) -> dict:
         "title": idea.title,
         "category": idea.category,
         "content_type": idea.content_type,
+        "format": idea.format,
         "breed": idea.breed,
         "platform": idea.platform,
         "concept": idea.concept,

@@ -85,6 +85,7 @@ def run_daily_workflow(db: Session, run_type: str = "daily") -> Briefing:
                     "platform": i.platform,
                     "category": i.category,
                     "content_type": i.content_type,
+                    "format": i.format,
                     "priority_score": i.priority_score,
                     "is_primary": (primary is not None and i.id == primary.id),
                 }

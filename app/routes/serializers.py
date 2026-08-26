@@ -41,6 +41,7 @@ def idea_dict(i: Idea, *, full: bool = False) -> dict:
         "title": i.title,
         "category": i.category,
         "content_type": i.content_type,
+        "format": i.format,
         "breed": i.breed,
         "platform": i.platform,
         "trend_source": i.trend_source,
