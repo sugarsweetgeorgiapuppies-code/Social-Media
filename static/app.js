@@ -28,8 +28,14 @@ const TYPE_LABEL = {
   current_trend: "Trending now", evergreen: "Always works", conversion: "Brings people in",
   experimental: "Worth a test", recurring_series: "Series", community_engagement: "Get comments",
 };
+const FORMAT_LABEL = {
+  puppy_focus: "🐶 Puppy on screen", voiceover: "🎙️ Voiceover", talking_head: "🗣️ Talking to camera",
+  skit: "🎭 Mini skit", text_only: "🔠 Text only",
+};
+const FORMATS = Object.keys(FORMAT_LABEL);
 const catIcon = (c) => CAT_ICON[c] || "🐶";
 const platIcon = (p) => PLAT_ICON[p] || "🌐";
+const fmtLabel = (f) => FORMAT_LABEL[f] || f;
 
 /* ---------------------------------------------------------- status bar */
 async function loadStatus() {
@@ -74,6 +80,7 @@ function chips(i) {
   return `<div class="chips">
     <span class="chip plat">${platIcon(i.platform)} ${esc(i.platform)}</span>
     <span class="chip cat">${esc(i.category)}</span>
+    ${i.format ? `<span class="chip fmt">${esc(fmtLabel(i.format))}</span>` : ""}
     ${i.breed ? `<span class="chip breed">${esc(i.breed)}</span>` : ""}
     ${i.content_type ? `<span class="chip">${esc(TYPE_LABEL[i.content_type] || i.content_type)}</span>` : ""}
   </div>`;
@@ -331,6 +338,7 @@ function newIdeaForm() {
       <div class="fld full"><label>Title</label><input id="n-title" placeholder="e.g. Yorkie meets a giant toy"></div>
       <div class="fld"><label>Platform</label><select id="n-plat">${plats.map((p) => `<option>${p}</option>`).join("")}</select></div>
       <div class="fld"><label>Category</label><select id="n-cat">${cats.map((c) => `<option>${c}</option>`).join("")}</select></div>
+      <div class="fld"><label>Video format</label><select id="n-fmt">${FORMATS.map((f) => `<option value="${f}">${esc(fmtLabel(f))}</option>`).join("")}</select></div>
       <div class="fld"><label>Breed (optional)</label><input id="n-breed" placeholder="Yorkie"></div>
       <div class="fld"><label>Difficulty</label><select id="n-diff"><option>Easy</option><option selected>Medium</option><option>Hard</option></select></div>
       <div class="fld full"><label>What happens in the video?</label><textarea id="n-concept"></textarea></div>
@@ -340,8 +348,9 @@ function newIdeaForm() {
   $("#n-save").addEventListener("click", async () => {
     const title = $("#n-title").value.trim(); if (!title) return toast("Give it a title first");
     const idea = await api.post("/api/ideas", {
-      title, platform: $("#n-plat").value, category: $("#n-cat").value, breed: $("#n-breed").value,
-      difficulty: $("#n-diff").value, concept: $("#n-concept").value, hook: $("#n-hook").value,
+      title, platform: $("#n-plat").value, category: $("#n-cat").value, format: $("#n-fmt").value,
+      breed: $("#n-breed").value, difficulty: $("#n-diff").value, concept: $("#n-concept").value,
+      hook: $("#n-hook").value,
     });
     toast("Idea created"); openIdea(idea.id);
   });
@@ -424,6 +433,7 @@ async function openIdea(id) {
         <button class="btn subtle sm" data-act="more_educational">More helpful</button>
         <button class="btn subtle sm" data-act="regenerate">Fresh version</button>
         <select id="chg-breed" class="sm"><option value="">Different breed…</option>${BREEDS.map((b) => `<option>${b}</option>`).join("")}</select>
+        <select id="chg-fmt" class="sm"><option value="">Switch format…</option>${FORMATS.map((f) => `<option value="${f}">${esc(fmtLabel(f))}</option>`).join("")}</select>
       </div></div>` : ""}
 
     ${packageBlock}
@@ -464,6 +474,14 @@ async function openIdea(id) {
   }));
   const cb = $("#chg-breed");
   if (cb) cb.addEventListener("change", async (e) => { if (!e.target.value) return; toast("Rewriting…"); await api.post(`/api/ideas/${id}/action`, { action: "change_breed", value: e.target.value }); reload(); });
+  const cf = $("#chg-fmt");
+  if (cf) cf.addEventListener("change", async (e) => {
+    if (!e.target.value) return;
+    toast("Switching format & rewriting…");
+    await api.patch(`/api/ideas/${id}`, { format: e.target.value });
+    await api.post(`/api/ideas/${id}/action`, { action: "regenerate", value: `film this as a ${e.target.value.replace(/_/g, " ")} video` });
+    reload();
+  });
 
   $("#save-sched")?.addEventListener("click", async () => {
     await api.patch(`/api/ideas/${id}`, { assigned_employee: $("#a-emp").value, recording_date: $("#a-rec").value || null, publishing_date: $("#a-pub").value || null, suggested_reuse_date: $("#a-reuse").value || null });
