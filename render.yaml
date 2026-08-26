@@ -1,0 +1,24 @@
+# Render deploy config for the Sugar Sweet Georgia Puppies SOCIAL MEDIA app
+# (Phil's filming hub — Today / This Week). This is SEPARATE from the store
+# wall-display "Board", which has its own service on its own branch.
+#
+# The Anthropic key is NOT in here — set it in the Render dashboard (Environment
+# tab) so the secret stays out of git.
+services:
+  - type: web
+    name: ssgp-social-media
+    runtime: python
+    plan: free # bump to "starter" ($7/mo) to keep it always-on
+    branch: claude/sugar-sweet-puppies-social-agent-jxel3d
+    autoDeploy: true
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run.py
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false # set this in the Render dashboard (secret) to enable live research
+      - key: DAILY_RUN_ENABLED
+        value: "true" # run the daily research/briefing so "Today" is ready each morning
+      - key: DAILY_RUN_TIME
+        value: "07:00"
+      - key: TIMEZONE
+        value: America/New_York
