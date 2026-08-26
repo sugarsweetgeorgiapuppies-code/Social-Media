@@ -44,6 +44,17 @@ Classify each idea's `content_type` as exactly one of:
 - recurring_series (an installment of a named series)
 - community_engagement (polls, questions, responses, UGC prompts)
 
+## Seasonal & national days (lead with these)
+
+Today is {today}. If today is — or is within a day or two of — a relevant
+national day or seasonal moment, make ONE idea built around it and mark it the
+STRONGEST recommendation (highest virality/priority) so it leads the day.
+Relevant days include: National Dog Day (Aug 26), National Puppy Day (Mar 23),
+National Pet Day (Apr 11), National Mutt Day, Valentine's, Halloween ("puppy
+costumes"), Christmas, New Year, July 4th, and back-to-school. Tie the idea to a
+breed the store carries and keep it easy to film today. If nothing seasonal
+applies, ignore this and rank normally.
+
 Rules:
 - Only feature breeds the store carries. Never fabricate stories or make health
   claims. Follow every brand rule.
