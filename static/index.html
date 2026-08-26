@@ -3,12 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#18c8e0" />
+    <meta name="theme-color" content="#0e9bad" />
     <title>Sugar Sweet Georgia Puppies — Social Media Employee</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&family=Nunito:wght@400;500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/static/style.css" />
@@ -29,19 +29,37 @@
       <div class="top-actions">
         <span class="pill" id="mode-pill" title="Research mode">…</span>
         <button class="btn primary" id="run-research">
-          <span class="ic">✨</span><span class="lbl">Get today's plan</span>
+          <span class="lbl">Get today's plan</span>
         </button>
       </div>
     </header>
 
     <nav class="nav" id="nav">
-      <div class="nav-brand">🐶 <span>SSGP</span></div>
-      <button data-tab="today" class="active"><span>🐶</span>Today</button>
-      <button data-tab="chat"><span>💬</span>Ask</button>
-      <button data-tab="ideas"><span>💡</span>Ideas</button>
-      <button data-tab="calendar"><span>📅</span>Plan</button>
-      <button data-tab="results"><span>📊</span>Results</button>
-      <button data-tab="more"><span>⋯</span>More</button>
+      <div class="nav-brand"><span class="nb-mark">🐶</span><span>Sugar Sweet</span></div>
+      <button data-tab="today" class="active">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+        <span class="t">Today</span>
+      </button>
+      <button data-tab="chat">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/></svg>
+        <span class="t">Ask</span>
+      </button>
+      <button data-tab="ideas">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.2 1 2.5h6c0-1.3.3-1.8 1-2.5A6 6 0 0 0 12 3Z"/></svg>
+        <span class="t">Ideas</span>
+      </button>
+      <button data-tab="calendar">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v3M16 3v3"/></svg>
+        <span class="t">Plan</span>
+      </button>
+      <button data-tab="results">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V10M12 21V4M19 21v-7"/></svg>
+        <span class="t">Results</span>
+      </button>
+      <button data-tab="more">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+        <span class="t">More</span>
+      </button>
     </nav>
 
     <main id="view"><div class="skeleton-wrap" id="boot"></div></main>
