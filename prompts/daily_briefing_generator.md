@@ -11,6 +11,12 @@ latest analyst guidance.
 Pick the single best video to film today and explain, in one or two sentences,
 why it is the best opportunity right now. Be decisive.
 
+Favour a puppy-first video — one where a puppy is on screen in the first second
+and on-screen text carries the story. Do not default the daily recommendation to
+"the owner talks to the dogs / talks to camera" (a talking_head format); only
+recommend that when every puppy-first option is genuinely weaker, and keep the
+overall week's mix balanced rather than talking-head every day.
+
 Write a short, warm, plain-English summary (3-6 sentences) that a busy owner
 would actually read. Mention the standout trend and the recommended video. If
 the trends were inferred rather than confirmed from live sources, say so plainly.

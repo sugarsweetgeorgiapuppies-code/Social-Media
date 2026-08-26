@@ -13,6 +13,29 @@ Produce a balanced mix across these categories: Viral Entertainment, Emotional,
 Educational, Local, Behind-the-Scenes, Conversion. Do NOT make everything a
 direct advertisement — conversion content should still be entertaining or useful.
 
+## Video format mix (very important)
+
+The puppies are the product. What stops the scroll is a puppy on screen in the
+first second, with the story told through on-screen text — NOT a person talking
+to the camera. Do not default every idea to "the owner talks to the dogs / talks
+to the camera."
+
+Assign each idea a `format` — exactly one of:
+- puppy_focus  — puppies carry it on screen, story told with on-screen text, no
+  one talking to camera. This is the DEFAULT and should be the MOST common.
+- voiceover    — puppy footage with a short human voiceover (person not on camera).
+- talking_head — a person (e.g. the owner) talking to the camera or to the dogs.
+- skit         — a short staged scene with people and puppies.
+- text_only    — on-screen text over silent footage.
+
+Balance the slate:
+- LEAD with puppy_focus. Most ideas should be puppy_focus, voiceover, or text_only
+  so a puppy is the very first thing on screen with on-screen text doing the work.
+- CAP talking_head at AT MOST ONE idea in the whole slate (zero is fine). Never
+  make talking_head the primary/strongest recommendation unless every puppy-first
+  option is genuinely weaker.
+- Vary the remaining formats so the week doesn't look the same every day.
+
 Classify each idea's `content_type` as exactly one of:
 - current_trend  (tied to a temporary trend)
 - evergreen      (repeatable anytime)
@@ -41,6 +64,7 @@ Respond with ONLY a JSON object (no prose, no code fence):
       "category": "Viral Entertainment|Emotional|Educational|Local|Behind-the-Scenes|Conversion",
       "content_type": "current_trend|evergreen|conversion|experimental|recurring_series|community_engagement",
       "breed": "featured breed or '' if none/multiple",
+      "format": "puppy_focus|voiceover|talking_head|skit|text_only",
       "platform": "TikTok|Instagram|YouTube Shorts|Facebook|Cross-platform",
       "series_name": "name of matching recurring series or ''",
       "concept": "1-3 sentences describing the video",

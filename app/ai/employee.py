@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..logging_config import get_logger
-from ..models import ConversationMessage, Idea
+from ..models import CONTENT_FORMATS, DEFAULT_FORMAT, ConversationMessage, Idea
 from ..seed import brand_rules_dict
 from ..services import analytics, dedup
 from ..services import briefing as briefing_svc
@@ -122,6 +122,9 @@ def _tool_create_idea(db: Session, inp: dict):
     if not title:
         return ("No title provided.", None)
     fp = dedup.fingerprint(title, "", inp.get("category", ""), inp.get("breed", ""))
+    fmt = (inp.get("format") or "").strip().lower()
+    if fmt not in CONTENT_FORMATS:
+        fmt = DEFAULT_FORMAT
     idea = Idea(
         title=title,
         category=inp.get("category") or "Viral Entertainment",
@@ -129,6 +132,7 @@ def _tool_create_idea(db: Session, inp: dict):
         breed=inp.get("breed", ""),
         concept=inp.get("concept", ""),
         content_type="evergreen",
+        format=fmt,
         priority_score=ideas_svc.compute_priority(6, 5, "Medium", weights),
         status="New",
         fingerprint=fp,

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from .config import BASE_DIR, settings
@@ -30,12 +30,38 @@ class Base(DeclarativeBase):
     pass
 
 
+def _lightweight_migrate() -> None:
+    """Add newly-introduced columns to existing tables.
+
+    ``create_all`` only creates missing tables — it never alters an existing
+    one — so a persisted database (e.g. the live deploy's SQLite file) would be
+    missing columns added after it was first created. We add them in place so a
+    deploy never has to drop data. Only additive, nullable/defaulted columns are
+    handled here; anything more involved would warrant a real migration tool.
+    """
+    # column name -> DDL type + default used when back-filling existing rows
+    expected: dict[str, dict[str, str]] = {
+        "ideas": {"format": "VARCHAR(40) DEFAULT 'puppy_focus'"},
+    }
+    insp = inspect(engine)
+    existing_tables = set(insp.get_table_names())
+    with engine.begin() as conn:
+        for table, columns in expected.items():
+            if table not in existing_tables:
+                continue  # create_all will build it fresh with every column
+            have = {c["name"] for c in insp.get_columns(table)}
+            for col, ddl in columns.items():
+                if col not in have:
+                    conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {col} {ddl}'))
+
+
 def init_db() -> None:
     """Create tables if they do not exist and seed defaults."""
     from . import models  # noqa: F401  (register mappers)
 
     Path(BASE_DIR / "data").mkdir(parents=True, exist_ok=True)
     Base.metadata.create_all(bind=engine)
+    _lightweight_migrate()
 
     from .seed import seed_defaults
 

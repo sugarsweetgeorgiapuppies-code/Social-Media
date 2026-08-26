@@ -10,6 +10,7 @@ class IdeaCreate(BaseModel):
     title: str
     category: str = "Viral Entertainment"
     content_type: str = "evergreen"
+    format: str = "puppy_focus"
     breed: str = ""
     platform: str = "Instagram"
     concept: str = ""
@@ -27,6 +28,7 @@ class IdeaUpdate(BaseModel):
     title: str | None = None
     category: str | None = None
     content_type: str | None = None
+    format: str | None = None
     breed: str | None = None
     platform: str | None = None
     concept: str | None = None
